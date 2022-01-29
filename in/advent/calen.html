@@ -1,0 +1,84 @@
+<html>
+<head>
+<title>Chrimbo Advent Calendar</title>
+<style>
+body {
+	font: 10px Verdana,Sans Serif;
+	background: transparent url('back_sigh.jpg') no-repeat top left;
+	background-color: #123456;
+	border:0;
+	margin:0;
+}
+img { border:0; }
+.door {
+	position: absolute;
+	width: 75px;
+	height: 75px;
+	border: 1px solid red;
+	display: none;
+}
+.lastdoor {
+	position: absolute;
+	width: 150px;
+	height: 150px;
+	border: 1px solid red;
+	display: none;
+}
+#main {
+	background: transparent url('ingenta_advent_trans.gif') no-repeat top left;
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	width: 890px;
+	height: 600px;
+}
+#foot {
+	text-align: center;
+	background-color: #ffffff;
+	color: #123456;
+	position: absolute;
+	top: 610px;
+	left: 0px;
+	width: 890px;
+	height: 12px;
+	border: 1px solid green;
+	float: left;
+}
+</style>
+<script type="text/javascript" src="calen.js"></script>
+</head>
+<body>
+
+<div id="main">
+	<div id="door_1" class="door" style="top:10; left:30;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_2" class="door" style="top:10; left:120;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_3" class="door" style="top:10; left:210;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_4" class="door" style="top:10; left:300;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_5" class="door" style="top:100; left:30;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_6" class="door" style="top:100; left:120;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_7" class="door" style="top:100; left:210;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_8" class="door" style="top:100; left:300;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_9" class="door" style="top:190; left:30;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_10" class="door" style="top:190; left:120;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_11" class="door" style="top:190; left:210;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_12" class="door" style="top:190; left:300;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_13" class="door" style="top:280; left:30;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_14" class="door" style="top:280; left:120;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_15" class="door" style="top:280; left:210;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_16" class="door" style="top:280; left:300;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_17" class="door" style="top:370; left:30;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_18" class="door" style="top:370; left:120;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_19" class="door" style="top:370; left:210;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_20" class="door" style="top:370; left:300;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_21" class="door" style="top:370; left:390;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_22" class="door" style="top:370; left:480;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_23" class="door" style="top:370; left:570;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_24" class="door" style="top:370; left:660;"><img src="dooropen.gif" alt="door open" title="open door" /></div>
+	<div id="door_25" class="lastdoor" style="top:30; left:650;"><img src="dooropen.gif" alt="last door open" title="last open door" /></div>
+</div>
+<div id="foot">
+	<script language="javascript" type="text/javascript">Getoday();WriteDaysToGo();</script> <a href="Javascript:OpenAll();">Open all doors</a>
+</div>
+
+</body>
+</html>
