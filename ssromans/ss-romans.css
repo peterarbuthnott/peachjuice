@@ -1,0 +1,80 @@
+body {
+    font-family: monospace, sans-serif;
+}
+
+#container-index {
+    font-size: 30px;
+    color: #ff0033;
+}
+
+#container {
+    display: inline-block;
+    position: absolute;
+    color: #fff;
+}
+
+#container > span {
+    position: absolute;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.cardImage {
+    display: inline-block;
+}
+
+.setNumber {
+    top: 90px;
+    width: 100px;
+    left: 40px;
+    font-size: 50px;
+    font-weight: bold;
+}
+
+.setFlag {
+    top: 205px;
+    left: 40px;
+    width: 100px;
+}
+
+.setProfile {
+    top: 60px;
+    left: 150px;
+}
+
+.setName {
+    top: 325px;
+    width: 350px;
+    left: 20px;
+    font-weight: bolder;
+    font-size: 50px;
+}
+
+.setSuperPower {
+    top: 375px;
+    left: 20px;
+    width: 350px;
+    font-size: 30px;
+}
+
+.setStatsAttacking, .setStatsDefending, .setStatsRomans {
+    top: 415px;
+    line-height: 19px;
+    font-size: 21px;
+}
+
+.setStatsAttacking {
+    left: 45px;
+}
+
+.setStatsDefending {
+    left: 155px;
+}
+
+.setStatsRomans {
+    left: 270px;
+}
+
+.setStatsLeft > span, .setStatsRight > span {
+    font-size: 40px;
+}
