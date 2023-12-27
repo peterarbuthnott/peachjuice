@@ -7,6 +7,15 @@ body {
     color: #ff0033;
 }
 
+#container-index img {
+    position: absolute;
+    left: 250px;
+}
+
+#container-index ul li {
+    list-style: none;
+}
+
 #container {
     display: inline-block;
     position: absolute;
