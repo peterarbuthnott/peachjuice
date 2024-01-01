@@ -3,13 +3,13 @@ body {
 }
 
 #container-index {
-    font-size: 30px;
     color: #ff0033;
+    font-size: 30px;
 }
 
 #container-index img {
-    position: absolute;
     left: 250px;
+    position: absolute;
 }
 
 #container-index ul li {
@@ -17,9 +17,9 @@ body {
 }
 
 #container {
+    color: #fff;
     display: inline-block;
     position: absolute;
-    color: #fff;
 }
 
 #container > span {
@@ -32,48 +32,61 @@ body {
     display: inline-block;
 }
 
+#logo {
+    height: 600px;
+}
+
 .setNumber {
-    top: 90px;
-    width: 100px;
-    left: 40px;
     font-size: 50px;
     font-weight: bold;
+    left: 40px;
+    top: 90px;
+    width: 100px;
 }
 
 .setFlag {
-    top: 205px;
     left: 40px;
+    top: 205px;
     width: 100px;
 }
 
+#flag {
+    height: 40px;
+    width: 68px;
+}
+
 .setProfile {
-    top: 60px;
     left: 150px;
+    top: 60px;
+}
+
+#headshot {
+    height: 270px;
 }
 
 .setName {
-    top: 325px;
-    width: 350px;
-    left: 20px;
     font-weight: bolder;
     font-size: 50px;
+    left: 20px;
+    top: 325px;
+    width: 350px;
 }
 
 .setSuperPower {
-    top: 375px;
+    font-size: 20px;
     left: 20px;
+    top: 375px;
     width: 350px;
-    font-size: 30px;
 }
 
 .setStatsAttacking, .setStatsDefending, .setStatsRomans {
-    top: 415px;
-    line-height: 19px;
     font-size: 21px;
+    line-height: 19px;
+    top: 415px;
 }
 
 .setStatsAttacking {
-    left: 45px;
+    left: 50px;
 }
 
 .setStatsDefending {
@@ -81,7 +94,7 @@ body {
 }
 
 .setStatsRomans {
-    left: 270px;
+    left: 275px;
 }
 
 .setStatsLeft > span, .setStatsRight > span {
