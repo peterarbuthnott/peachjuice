@@ -7,13 +7,14 @@ body {
     font-size: 30px;
 }
 
-#container-index img {
-    left: 250px;
-    position: absolute;
-}
-
 #container-index ul li {
     list-style: none;
+}
+
+#romans-2023-24 {
+    left: 250px;
+    width: 400px;
+    position: absolute;
 }
 
 #container {
@@ -28,7 +29,7 @@ body {
     text-transform: uppercase;
 }
 
-.cardImage {
+.card-image-background {
     display: inline-block;
 }
 
@@ -36,7 +37,7 @@ body {
     height: 600px;
 }
 
-.setNumber {
+.player-shirt-number {
     font-size: 50px;
     font-weight: bold;
     left: 40px;
@@ -44,7 +45,7 @@ body {
     width: 100px;
 }
 
-.setFlag {
+.player-country-flag {
     left: 40px;
     top: 205px;
     width: 100px;
@@ -55,7 +56,7 @@ body {
     width: 68px;
 }
 
-.setProfile {
+.player-picture {
     left: 150px;
     top: 60px;
 }
@@ -64,7 +65,7 @@ body {
     height: 270px;
 }
 
-.setName {
+.player-name {
     font-weight: bolder;
     font-size: 50px;
     left: 20px;
@@ -72,28 +73,28 @@ body {
     width: 350px;
 }
 
-.setSuperPower {
+.player-super-power {
     font-size: 20px;
     left: 20px;
     top: 375px;
     width: 350px;
 }
 
-.setStatsAttacking, .setStatsDefending, .setStatsRomans {
+.attacking-stats, .defending-stats, .romans-stats {
     font-size: 21px;
     line-height: 19px;
     top: 415px;
 }
 
-.setStatsAttacking {
+.attacking-stats {
     left: 50px;
 }
 
-.setStatsDefending {
+.defending-stats {
     left: 155px;
 }
 
-.setStatsRomans {
+.romans-stats {
     left: 275px;
 }
 
