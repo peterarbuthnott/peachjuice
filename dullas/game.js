@@ -1,24 +1,32 @@
 // ============================================================================
-// DISH DUTY - core game loop
+// DULLAS DISHWATER - core game loop
 //
 // Round 1 starts with 5 dirty plates. Just pass the mouse (sponge) over a
 // plate to scrub it - no need to click and hold. Clean plates -> earn
-// plates (currency) -> spend them on upgrades in the side panel, or clean
-// every plate in a round to advance.
+// plates (currency) -> spend them on upgrades in the always-open side
+// panel, or clean every plate in a round to advance.
 //
-// Plates are the same fixed size every round. Each round is a stack of
-// dirty plates; only the top one is active/scrubbable, the rest peek out
-// underneath at random offsets. A plate only counts as clean once every
-// part of it has been directly touched by the sponge AND the grime average
-// is low enough - so a quick swipe that only grazes the middle won't cut it.
-// The on-screen cleanliness bar is cosmetically remapped to always run a
-// clean 0% -> 100%, no matter what the real grime math underneath says.
-// Once clean, the plate animates over to a drying rack in the bottom-right
-// corner before the next dirty plate becomes active.
+// Plates are the same fixed size every round. Each round is a pile of dirty
+// plates rendered all at once behind the active one; only the top one is
+// scrubbable, the rest peek out underneath at random offsets bounded so
+// they always stay within the active plate's own circle. A plate only
+// counts as clean once every part of it has been directly touched by the
+// sponge AND the grime average is low enough - so a quick swipe that only
+// grazes the middle won't cut it. The on-screen cleanliness bar is
+// cosmetically remapped to always run a clean 0% -> 100%, no matter what
+// the real grime math underneath says.
+//
+// Once clean, the plate animates over to whichever drying stack is
+// currently being filled. Stacks hold up to 40 plates each and live inside
+// one shared container in the bottom-right, showing up to 4 stacks side by
+// side; they're cleared out at the start of every round. If a round needs
+// a 5th stack, the whole view slides down: the oldest stack scrolls off
+// and everything shifts one slot over. Filling a stack completely pays out
+// a bonus. See the stack section below.
 //
 // About 5% of plates roll as golden: a different colour scheme, an extra
 // sparkle flourish, worth far more currency, and shown gold-coloured once
-// they land in the rack too.
+// they land in a stack too.
 //
 // The file is split into clearly separated sections so future rounds and
 // upgrades (new plate types, sponge upgrades, multipliers, timers, etc.) can
@@ -31,12 +39,11 @@ const ctx = canvas.getContext('2d');
 
 const roundCompletePanel = document.getElementById('round-complete-panel');
 const roundCompleteTitle = document.getElementById('round-complete-title');
-const roundCompleteScore = document.getElementById('round-complete-score');
+const roundCompleteCleaned = document.getElementById('round-complete-cleaned');
+const roundCompleteEarned = document.getElementById('round-complete-earned');
 const roundCompleteBonus = document.getElementById('round-complete-bonus');
 const nextRoundBtn = document.getElementById('next-round-btn');
 
-const upgradePanel = document.getElementById('upgrade-panel');
-const upgradeToggleBtn = document.getElementById('upgrade-toggle-btn');
 const upgradeListEl = document.getElementById('upgrade-list');
 
 const CANVAS_W = canvas.width;
@@ -46,19 +53,69 @@ const HUD_HEIGHT = 90;
 // Fixed plate size and position for every round - plates never shrink as
 // rounds add more of them.
 const PLATE_RADIUS = 211;
-const ACTIVE_X = 310;
+const ACTIVE_X = 260;
 const ACTIVE_Y = 350;
 
-// Bottom-right drying rack where cleaned plates for the current round pile up.
-const RACK_BOX = { x: CANVAS_W - 170, y: CANVAS_H - 170, w: 150, h: 140 };
-const RACK_CENTER_X = RACK_BOX.x + RACK_BOX.w / 2;
-const RACK_BASE_Y = RACK_BOX.y + RACK_BOX.h - 20;
+// The dirty-plate pile behind the active plate: every waiting plate is
+// drawn, but its peek-out distance is capped well under PLATE_RADIUS so
+// even the very last (farthest) plate's centre stays inside the active
+// plate's own circle, and comfortably on-screen (and clear of the drying
+// stacks' container over on the right).
+const STACK_MAX_OFFSET = 90;
+
+// ----------------------------------------------------------------------------
+// Drying stacks (formerly "racks"): one shared container in the bottom-right
+// holds up to 4 stacks side by side, each capped at 40 plates. Stacks keep
+// filling up across rounds (they are NOT reset when a round ends). Once a
+// 5th stack is needed, the lowest (oldest) stack is cleared outright - its
+// data is dropped, not just hidden - and every other stack shifts down one
+// slot, so the array never holds more than STACK_SLOT_COUNT stacks and a
+// stack index always equals its visible slot directly.
+// ----------------------------------------------------------------------------
+const STACK_CAPACITY = 40;
+const STACK_SLOT_COUNT = 4;
+const STACK_PLATE_SPACING = 12;
+const STACK_COLUMN_WIDTH = 45; // 50% narrower than the original 90px columns
+const STACK_FILL_BONUS_PLATES = 4; // paid out (at the current plates-per-plate rate) when a stack fills up
+
+const STACK_CONTAINER = { w: STACK_SLOT_COUNT * STACK_COLUMN_WIDTH };
+STACK_CONTAINER.h = STACK_CAPACITY * STACK_PLATE_SPACING + 40; // fits the window height exactly, with room for the heading
+STACK_CONTAINER.x = CANVAS_W - 20 - STACK_CONTAINER.w;
+STACK_CONTAINER.y = CANVAS_H - 20 - STACK_CONTAINER.h;
+const STACK_BASE_Y = STACK_CONTAINER.y + STACK_CONTAINER.h - 20;
+
+function stackColumnX(slot) {
+  return STACK_CONTAINER.x + STACK_COLUMN_WIDTH * slot;
+}
+function stackPlatePosition(stackIndex, plateIndexInStack) {
+  return {
+    x: stackColumnX(stackIndex) + STACK_COLUMN_WIDTH / 2,
+    y: STACK_BASE_Y - plateIndexInStack * STACK_PLATE_SPACING,
+  };
+}
+function currentStackIndex() {
+  return state.stacks.length - 1;
+}
+// Makes sure the currently-filling stack has room; if it's already full,
+// starts a new one (clearing out the lowest stack first if we're already
+// showing the max number of slots) and pays out the fill bonus.
+function ensureStackSpace() {
+  if (state.stacks[currentStackIndex()].length >= STACK_CAPACITY) {
+    if (state.stacks.length >= STACK_SLOT_COUNT) {
+      state.stacks.shift(); // clear the lowest (oldest) stack - it's gone, not just hidden
+    }
+    state.stacks.push([]);
+    const bonus = STACK_FILL_BONUS_PLATES * NORMAL_REWARD * state.rewardMultiplier;
+    state.platesCleaned += bonus;
+    state.roundCurrencyEarned += bonus;
+    renderUpgradePanel();
+  }
+}
 
 const CLEAN_THRESHOLD = 0.95; // average grime remaining must drop below this
 const COVERAGE_THRESHOLD = 0.95; // fraction of the plate that must have been directly touched
 
 // Golden plates: rare, worth far more currency, and dressed up visually.
-const BASE_GOLDEN_CHANCE = 0.05;
 const GOLD_FILL_DIRTY = '#f2dfa0';
 const GOLD_FILL_CLEAN = '#fff3c4';
 const GOLD_STROKE_DIRTY = '#c9a227';
@@ -66,22 +123,40 @@ const GOLD_STROKE_CLEAN = '#ffd700';
 const GOLD_REWARD = 10;
 const NORMAL_REWARD = 1;
 
+// Lucky Sponge: starts at 1% and adds a flat +10% per purchase, capped at 99%.
+const BASE_GOLDEN_CHANCE = 0.01;
+const GOLDEN_CHANCE_PER_LEVEL = 0.10;
+const GOLDEN_CHANCE_CAP = 0.99;
+
 function currentGoldenChance() {
   const level = state.upgrades.goldenBoost || 0;
-  return Math.min(1, BASE_GOLDEN_CHANCE * Math.pow(2, level));
+  return Math.min(GOLDEN_CHANCE_CAP, BASE_GOLDEN_CHANCE + level * GOLDEN_CHANCE_PER_LEVEL);
 }
 
 // Speed bonus: round 1's 5 plates need to be finished in under a minute,
 // which works out to a 12-second-per-plate budget. Bigger rounds (from the
-// "extra dishes" upgrade, or just later rounds) get proportionally more time.
+// "extra dishes" upgrade, or just later rounds) get proportionally more
+// time. Both this and the stack-fill bonus are expressed as a number of
+// plates, then converted to currency at the CURRENT plates-per-plate rate.
 const TIME_BONUS_SECONDS_PER_PLATE = 12;
-const TIME_BONUS_PAYOUT_FRACTION = 0.5; // 50% of the round's plates, awarded as currency
+const TIME_BONUS_PAYOUT_FRACTION = 0.5; // 50% of the round's plate count, as a plate bonus
 
-function formatTime(ms) {
+// Actual elapsed time can run into hours over a long session; the target
+// only ever needs minutes and seconds since it scales off a per-plate budget.
+function formatDuration(ms) {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+  return hours > 0
+    ? `${hours}h ${mins}m ${secs}s`
+    : `${mins}m ${secs}s`;
+}
+function formatMinSec(ms) {
   const totalSeconds = Math.floor(ms / 1000);
   const mins = Math.floor(totalSeconds / 60);
   const secs = totalSeconds % 60;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+  return `${mins}m ${secs}s`;
 }
 
 // ----------------------------------------------------------------------------
@@ -256,6 +331,14 @@ class Plate {
     return Math.max(0, Math.min(1, (real - this.startCleanPercent) / span));
   }
 
+  // Fully wipes the grime layer - used once a plate is confirmed clean so
+  // there's no trace of dirt left, even if the completion thresholds
+  // allowed a sliver of residue through.
+  clearAllDirt() {
+    this.dirtCtx.clearRect(0, 0, this.size, this.size);
+    this._dirtCacheStale = true;
+  }
+
   draw(ctx) {
     const golden = this.isGolden;
     ctx.save();
@@ -298,7 +381,7 @@ class Plate {
     }
 
     // Golden badge label, shown while the plate is at (roughly) full size -
-    // hidden once it starts shrinking away to the rack.
+    // hidden once it starts shrinking away to the stack.
     if (golden && this.radius > PLATE_RADIUS * 0.8) {
       ctx.save();
       ctx.fillStyle = '#fff8dc';
@@ -350,10 +433,10 @@ function platesForRound(round) {
 const state = {
   round: 1,
   activePlate: null,
-  animatingPlate: null, // plate mid-flight to the rack, see startPlateAnimation()
+  animatingPlate: null, // plate mid-flight to a stack, see startPlateAnimation()
   stackRemaining: 0, // dirty plates still waiting underneath the active one
   stackOffsets: [], // random peek-out offset per waiting plate, see generateStackOffsets()
-  rackPlates: [], // one bool (isGolden) per clean plate piled in this round's rack, oldest first
+  stacks: [[]], // one array per drying stack (isGolden bools); persists & fills up across rounds - see ensureStackSpace()
   isScrubbing: false,
   mouseX: CANVAS_W / 2,
   mouseY: CANVAS_H / 2,
@@ -363,17 +446,24 @@ const state = {
   roundComplete: false,
   roundStartTime: 0, // performance.now() when the current round began, for the speed bonus
   roundTotalPlates: 0, // total plates in the current round, captured at round start
+  roundPlatesWashed: 0, // plates washed so far THIS round only, reset each round
+  roundCurrencyEarned: 0, // currency earned so far THIS round only (incl. bonuses)
   bubbles: [], // small suds particles while scrubbing
   platesCleaned: 0, // the game's currency: how many plates you've cleaned and can still spend
   totalPlatesWashed: 0, // lifetime count of actual plates washed this session (never spent)
+  goldenPlatesWashed: 0, // lifetime count of golden plates specifically - subset of totalPlatesWashed
   upgrades: {}, // purchase counts per upgrade id, e.g. { largerSponge: 2 }
 };
 
 // ----------------------------------------------------------------------------
 // Upgrades: each entry is purchasable with plates (the currency). Cost
-// doubles every time that same upgrade is bought again. Add more entries
-// here as future upgrades are designed - the panel renders whatever is in
-// this list automatically.
+// multiplies by def.costMultiplier (default 2x, i.e. doubling) every time
+// that same upgrade is bought again. An entry with isMaxed() shows FULL and
+// stops being purchasable once that returns true; maxLevel (if set) is
+// shown next to the current level so the player can see the ceiling.
+// currentValueLabel() reports the upgrade's live effect. Every entry is
+// always shown in the panel, even before it unlocks - locked ones are just
+// dimmed and can't be bought yet.
 // ----------------------------------------------------------------------------
 const UPGRADE_DEFS = [
   {
@@ -381,44 +471,64 @@ const UPGRADE_DEFS = [
     name: 'Larger Sponge',
     description: '+20% sponge size',
     baseCost: 5,
-    apply: () => { state.spongeRadius *= 1.2; },
+    maxLevel: 11,
+    apply: () => { state.spongeRadius = Math.min(PLATE_RADIUS, state.spongeRadius * 1.2); },
+    isMaxed: () => (state.upgrades.largerSponge || 0) >= 11,
+    currentValueLabel: () => `${Math.round((state.spongeRadius / PLATE_RADIUS) * 100)}% of plate size`,
   },
   {
     id: 'efficientSponge',
     name: 'Efficient Sponge',
-    description: '+20% cleaning efficiency per stroke',
+    description: '+10% cleaning efficiency per stroke',
     baseCost: 25,
+    maxLevel: 10,
+    // The displayed 0%->100% progress is purely cosmetic - it's a clean
+    // 10%-per-level readout, independent of the real scrubEfficiency math
+    // that actually drives how much grime a stroke removes (see Plate.scrubAt).
     apply: () => { state.scrubEfficiency += 0.2; },
+    isMaxed: () => (state.upgrades.efficientSponge || 0) >= 10,
+    currentValueLabel: () => `${(state.upgrades.efficientSponge || 0) * 10}%`,
   },
   {
     id: 'doublePlates',
     name: 'Extra Dishes',
     description: 'Doubles the number of plates each round (from next round on)',
     baseCost: 50,
+    maxLevel: null,
     apply: () => { /* platesForRound() reads state.upgrades.doublePlates directly */ },
+    currentValueLabel: () => `${Math.pow(2, state.upgrades.doublePlates || 0)}x plates/round`,
   },
   {
     id: 'goldenBoost',
     name: 'Lucky Sponge',
-    description: 'Doubles the chance of a golden plate appearing',
+    description: '+10% chance of a golden plate appearing',
     baseCost: 100,
+    maxLevel: 10,
     apply: () => { /* currentGoldenChance() reads state.upgrades.goldenBoost directly */ },
+    isMaxed: () => (state.upgrades.goldenBoost || 0) >= 10,
+    currentValueLabel: () => `${Math.round(currentGoldenChance() * 100)}% golden chance`,
   },
   {
     id: 'platesPerPlate',
     name: 'Plates Per Plate',
     description: 'Doubles the plates you earn per plate cleaned',
     baseCost: 150,
+    costMultiplier: 3, // triples per purchase instead of the default doubling
+    maxLevel: 11,
     apply: () => { state.rewardMultiplier *= 2; },
+    isMaxed: () => (state.upgrades.platesPerPlate || 0) >= 11,
+    currentValueLabel: () => `${state.rewardMultiplier}x plates/plate`,
   },
 ];
 
 function upgradeCost(def) {
   const level = state.upgrades[def.id] || 0;
-  return def.baseCost * Math.pow(2, level);
+  return def.baseCost * Math.pow(def.costMultiplier || 2, level);
 }
 
-function buyUpgrade(def) {
+function buyUpgrade(def, index) {
+  if (!isUpgradeUnlocked(index)) return false;
+  if (def.isMaxed && def.isMaxed()) return false;
   const cost = upgradeCost(def);
   if (state.platesCleaned < cost) return false;
   state.platesCleaned -= cost;
@@ -428,8 +538,10 @@ function buyUpgrade(def) {
   return true;
 }
 
-// Upgrades unlock one at a time: an entry only shows up once the one before
-// it has been bought at least once. The first entry is always visible.
+// Upgrades unlock one at a time: an entry can only be bought once the one
+// before it has been bought at least once. The first entry is always
+// unlocked. Locked entries still show in the panel (per design), just
+// dimmed with a "Locked" button.
 function isUpgradeUnlocked(index) {
   if (index === 0) return true;
   const prevDef = UPGRADE_DEFS[index - 1];
@@ -439,49 +551,61 @@ function isUpgradeUnlocked(index) {
 function renderUpgradePanel() {
   upgradeListEl.innerHTML = '';
   UPGRADE_DEFS.forEach((def, index) => {
-    if (!isUpgradeUnlocked(index)) return;
-
+    const unlocked = isUpgradeUnlocked(index);
     const level = state.upgrades[def.id] || 0;
     const cost = upgradeCost(def);
-    const affordable = state.platesCleaned >= cost;
+    const maxed = def.isMaxed ? def.isMaxed() : false;
+    const affordable = unlocked && !maxed && state.platesCleaned >= cost;
+    const maxLevelLabel = def.maxLevel != null ? def.maxLevel : '∞';
 
     const item = document.createElement('div');
-    item.className = 'upgrade-item';
+    item.className = 'upgrade-item' + (unlocked ? '' : ' locked');
 
     const header = document.createElement('div');
     header.className = 'upgrade-item-header';
-    header.innerHTML = `<span class="upgrade-name">${def.name}</span><span class="upgrade-level">Lv. ${level}</span>`;
+    header.innerHTML = `<span class="upgrade-name">${def.name}</span><span class="upgrade-level">Lv. ${level} / ${maxLevelLabel}</span>`;
 
     const desc = document.createElement('p');
     desc.className = 'upgrade-desc';
     desc.textContent = def.description;
 
+    const meta = document.createElement('p');
+    meta.className = 'upgrade-meta';
+    meta.textContent = `Current: ${def.currentValueLabel()}`;
+
     const btn = document.createElement('button');
     btn.className = 'upgrade-buy-btn';
-    btn.textContent = `Buy - ${cost} plates`;
-    btn.disabled = !affordable;
-    btn.addEventListener('click', () => buyUpgrade(def));
+    if (!unlocked) {
+      btn.textContent = 'Locked';
+      btn.disabled = true;
+    } else if (maxed) {
+      btn.textContent = 'FULL';
+      btn.disabled = true;
+    } else {
+      btn.textContent = `Buy - ${cost} plates`;
+      btn.disabled = !affordable;
+      btn.addEventListener('click', () => buyUpgrade(def, index));
+    }
 
     item.appendChild(header);
     item.appendChild(desc);
+    item.appendChild(meta);
     item.appendChild(btn);
     upgradeListEl.appendChild(item);
   });
 }
 
-upgradeToggleBtn.addEventListener('click', () => {
-  upgradePanel.classList.toggle('open');
-});
-
 // Random peek-out offset for each dirty plate waiting under the active one.
-// Farther-back layers (higher index) stick out more. Generated once per
-// round so the stack doesn't jitter frame to frame; index 0 is always the
-// layer immediately beneath the active plate.
+// All of them are rendered (see drawStackPile()), but the distance is scaled
+// so even the very last (farthest) one never exceeds STACK_MAX_OFFSET -
+// keeping its centre inside the active plate's circle and on-screen.
+// Generated once per round so the pile doesn't jitter frame to frame; index
+// 0 is always the layer immediately beneath the active plate.
 function generateStackOffsets(count) {
   const offsets = [];
   for (let i = 0; i < count; i++) {
     const angle = Math.random() * Math.PI * 2;
-    const dist = 20 + i * 8 + Math.random() * 12;
+    const dist = count <= 1 ? STACK_MAX_OFFSET : (STACK_MAX_OFFSET * (i + 1)) / count;
     offsets.push({ x: Math.cos(angle) * dist, y: Math.sin(angle) * dist });
   }
   return offsets;
@@ -492,9 +616,12 @@ function startRound(roundNum) {
   const total = platesForRound(roundNum);
   state.roundTotalPlates = total;
   state.roundStartTime = performance.now();
+  state.roundPlatesWashed = 0;
+  state.roundCurrencyEarned = 0;
   state.stackRemaining = total - 1;
   state.stackOffsets = generateStackOffsets(state.stackRemaining);
-  state.rackPlates = [];
+  // Note: state.stacks is intentionally NOT reset here - stacks keep filling
+  // up across rounds; see ensureStackSpace() for how the oldest one clears.
   state.animatingPlate = null;
   state.activePlate = new Plate(ACTIVE_X, ACTIVE_Y, PLATE_RADIUS, Math.random() < currentGoldenChance());
   state.roundComplete = false;
@@ -508,17 +635,20 @@ function onRoundComplete() {
   const elapsed = performance.now() - state.roundStartTime;
   const timeLimitMs = state.roundTotalPlates * TIME_BONUS_SECONDS_PER_PLATE * 1000;
   const bonusEarned = elapsed < timeLimitMs;
-  const bonusAmount = bonusEarned ? Math.round(state.roundTotalPlates * TIME_BONUS_PAYOUT_FRACTION) : 0;
+  const bonusPlateCount = bonusEarned ? Math.round(state.roundTotalPlates * TIME_BONUS_PAYOUT_FRACTION) : 0;
+  const bonusAmount = bonusPlateCount * NORMAL_REWARD * state.rewardMultiplier;
   if (bonusAmount > 0) {
     state.platesCleaned += bonusAmount;
+    state.roundCurrencyEarned += bonusAmount;
     renderUpgradePanel();
   }
 
   roundCompleteTitle.textContent = `Round ${state.round} Complete!`;
-  roundCompleteScore.textContent = `Plates cleaned: ${state.platesCleaned}`;
+  roundCompleteCleaned.textContent = `Plates cleaned this round: ${state.roundPlatesWashed}`;
+  roundCompleteEarned.textContent = `Plates earned this round: ${state.roundCurrencyEarned}`;
   roundCompleteBonus.textContent = bonusEarned
-    ? `⏱ Finished in ${formatTime(elapsed)} - Speed bonus: +${bonusAmount} plates!`
-    : `⏱ Finished in ${formatTime(elapsed)} - too slow for the speed bonus (need under ${formatTime(timeLimitMs)})`;
+    ? `⏱ Finished in ${formatDuration(elapsed)} - Speed bonus: +${bonusAmount} plates! (target: under ${formatMinSec(timeLimitMs)})`
+    : `⏱ Finished in ${formatDuration(elapsed)} - too slow for the speed bonus (target: under ${formatMinSec(timeLimitMs)})`;
   roundCompletePanel.classList.remove('hidden');
 }
 
@@ -526,17 +656,27 @@ nextRoundBtn.addEventListener('click', () => {
   startRound(state.round + 1);
 });
 
-// Kicks off the fly-to-rack animation for a just-cleaned plate. The plate
+// Kicks off the fly-to-stack animation for a just-cleaned plate. The plate
 // object is reused (repositioned each frame) purely for drawing; once the
-// animation finishes it's discarded and a fresh dirty plate takes over.
+// animation finishes it's discarded and a fresh dirty plate takes over. The
+// target is computed up front so it flies straight to the exact spot on top
+// of whichever stack (and slot within that stack) it will actually land in.
 function startPlateAnimation(plate) {
   state.activePlate = null;
+  plate.clearAllDirt();
+
+  ensureStackSpace();
+  const stackIndex = currentStackIndex();
+  const plateIndexInStack = state.stacks[stackIndex].length;
+  const target = stackPlatePosition(stackIndex, plateIndexInStack);
+
   state.animatingPlate = {
     plate,
+    targetStackIndex: stackIndex,
     startTime: performance.now(),
     duration: 450,
     fromX: ACTIVE_X, fromY: ACTIVE_Y, fromR: PLATE_RADIUS,
-    toX: RACK_CENTER_X, toY: RACK_BASE_Y, toR: 34,
+    toX: target.x, toY: target.y, toR: 34,
   };
 }
 
@@ -553,9 +693,13 @@ function updatePlateAnimation() {
   if (t >= 1) {
     state.animatingPlate = null;
     const baseReward = anim.plate.isGolden ? GOLD_REWARD : NORMAL_REWARD;
-    state.platesCleaned += baseReward * state.rewardMultiplier;
+    const reward = baseReward * state.rewardMultiplier;
+    state.platesCleaned += reward;
     state.totalPlatesWashed += 1;
-    state.rackPlates.push(anim.plate.isGolden);
+    if (anim.plate.isGolden) state.goldenPlatesWashed += 1;
+    state.roundPlatesWashed += 1;
+    state.roundCurrencyEarned += reward;
+    state.stacks[anim.targetStackIndex].push(anim.plate.isGolden);
     renderUpgradePanel();
 
     if (state.stackRemaining > 0) {
@@ -664,11 +808,11 @@ function drawBackground() {
   }
 }
 
-// Dirty plates waiting underneath the active one. Purely visual - each one
-// peeks out in its own random direction, farther layers sticking out more.
-// Capped so a huge stack (later rounds) doesn't draw dozens of layers.
-function drawStack() {
-  const layers = Math.min(state.stackRemaining, 5);
+// Dirty plates waiting underneath the active one. Every plate in the pile
+// is rendered (see STACK_MAX_OFFSET for why the pile never runs off the
+// active plate's circle or off-screen even for huge piles).
+function drawStackPile() {
+  const layers = state.stackRemaining;
   for (let depth = layers; depth >= 1; depth--) {
     const off = state.stackOffsets[depth - 1];
     if (!off) continue;
@@ -716,41 +860,70 @@ function drawCleanlinessBar(percent) {
   ctx.restore();
 }
 
-// Drying rack in the bottom-right corner where finished plates for this
-// round pile up, viewed edge-on as stacked ellipses. The rack backdrop
-// grows upward to fit exactly how many plates are in it - no cap, no
-// "+N" overflow text.
-function drawRack() {
-  const total = state.rackPlates.length;
-  const boxBottom = RACK_BOX.y + RACK_BOX.h;
-  const boxH = Math.max(RACK_BOX.h, 60 + total * 12);
-  const boxY = Math.max(HUD_HEIGHT + 10, boxBottom - boxH);
-  const box = { x: RACK_BOX.x, y: boxY, w: RACK_BOX.w, h: boxBottom - boxY };
-  const baseY = boxBottom - 20;
-
+// Drying stacks: one shared "Stacks" container in the bottom-right, holding
+// up to STACK_SLOT_COUNT stacks of plates side by side. The array is kept
+// capped at STACK_SLOT_COUNT entries (see ensureStackSpace()), so every
+// stack currently in state.stacks is visible - nothing to skip here.
+function drawStacks() {
   ctx.save();
   ctx.fillStyle = 'rgba(0,0,0,0.2)';
-  ctx.fillRect(box.x, box.y, box.w, box.h);
+  ctx.fillRect(STACK_CONTAINER.x, STACK_CONTAINER.y, STACK_CONTAINER.w, STACK_CONTAINER.h);
   ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-  ctx.strokeRect(box.x, box.y, box.w, box.h);
+  ctx.strokeRect(STACK_CONTAINER.x, STACK_CONTAINER.y, STACK_CONTAINER.w, STACK_CONTAINER.h);
 
   ctx.fillStyle = '#e8f4ff';
-  ctx.font = '13px Segoe UI, Arial, sans-serif';
+  ctx.font = 'bold 13px Segoe UI, Arial, sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('Rack', RACK_CENTER_X, box.y + 16);
-
-  for (let i = 0; i < total; i++) {
-    const isGolden = state.rackPlates[i];
-    const cy = baseY - i * 12;
-    ctx.beginPath();
-    ctx.ellipse(RACK_CENTER_X, cy, 34, 10, 0, 0, Math.PI * 2);
-    ctx.fillStyle = isGolden ? '#ffd54f' : '#ffffff';
-    ctx.fill();
-    ctx.strokeStyle = isGolden ? '#b8860b' : '#cfd8dc';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-  }
+  ctx.fillText('Stacks', STACK_CONTAINER.x + STACK_CONTAINER.w / 2, STACK_CONTAINER.y + 16);
   ctx.textAlign = 'left';
+  ctx.restore();
+
+  // The array only ever holds up to STACK_SLOT_COUNT stacks (see
+  // ensureStackSpace()), so a stack's index is directly its visible slot.
+  state.stacks.forEach((stack, stackIndex) => {
+    stack.forEach((isGolden, i) => {
+      const pos = stackPlatePosition(stackIndex, i);
+      ctx.beginPath();
+      ctx.ellipse(pos.x, pos.y, 17, 10, 0, 0, Math.PI * 2);
+      ctx.fillStyle = isGolden ? '#ffd54f' : '#ffffff';
+      ctx.fill();
+      ctx.strokeStyle = isGolden ? '#b8860b' : '#cfd8dc';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    });
+  });
+}
+
+// Small pie-chart clock showing elapsed round time as a fraction of the
+// speed-bonus time limit: green while the bonus is still reachable, red
+// once the pie fills all the way round (the window has closed).
+function drawRoundTimer() {
+  const timeLimitMs = state.roundTotalPlates * TIME_BONUS_SECONDS_PER_PLATE * 1000;
+  const elapsed = performance.now() - state.roundStartTime;
+  const fraction = timeLimitMs > 0 ? Math.min(1, elapsed / timeLimitMs) : 1;
+  const cx = 45, cy = HUD_HEIGHT / 2, r = 26;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.fill();
+
+  if (fraction > 0) {
+    const startAngle = -Math.PI / 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, startAngle, startAngle + fraction * Math.PI * 2);
+    ctx.closePath();
+    ctx.fillStyle = fraction >= 1 ? '#e05252' : '#4caf7d';
+    ctx.fill();
+  }
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -759,19 +932,24 @@ function drawHUD() {
   ctx.fillStyle = 'rgba(0,0,0,0.35)';
   ctx.fillRect(0, 0, CANVAS_W, HUD_HEIGHT);
 
+  drawRoundTimer();
+
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 22px Segoe UI, Arial, sans-serif';
   ctx.textBaseline = 'middle';
-  ctx.fillText(`Round ${state.round}`, 20, HUD_HEIGHT / 2 - 12);
+  ctx.fillText(`Round ${state.round}`, 85, HUD_HEIGHT / 2 - 12);
   ctx.font = '15px Segoe UI, Arial, sans-serif';
   ctx.fillStyle = '#cfd8dc';
   const dirtyCount = state.stackRemaining + (state.activePlate ? 1 : 0);
-  ctx.fillText(`${dirtyCount} plate${dirtyCount === 1 ? '' : 's'} left to clean`, 20, HUD_HEIGHT / 2 + 14);
+  ctx.fillText(`${dirtyCount} plate${dirtyCount === 1 ? '' : 's'} left to clean`, 85, HUD_HEIGHT / 2 + 14);
 
   ctx.textAlign = 'center';
-  ctx.font = 'bold 20px Segoe UI, Arial, sans-serif';
+  ctx.font = 'bold 16px Segoe UI, Arial, sans-serif';
   ctx.fillStyle = '#ffffff';
-  ctx.fillText(`Cleaned: ${state.totalPlatesWashed}`, CANVAS_W / 2, HUD_HEIGHT / 2);
+  ctx.fillText(`Total Plates Cleaned: ${state.totalPlatesWashed}`, CANVAS_W / 2, HUD_HEIGHT / 2 - 12);
+  ctx.font = '13px Segoe UI, Arial, sans-serif';
+  ctx.fillStyle = '#ffd54f';
+  ctx.fillText(`Golden Plates Cleaned: ${state.goldenPlatesWashed}`, CANVAS_W / 2, HUD_HEIGHT / 2 + 12);
 
   ctx.textAlign = 'right';
   ctx.font = 'bold 22px Segoe UI, Arial, sans-serif';
@@ -786,7 +964,8 @@ function drawSponge() {
   ctx.save();
   ctx.translate(x, y);
 
-  // scrub-radius indicator
+  // scrub-radius indicator - this circle is the actual cleaning area, and
+  // matches state.spongeRadius exactly (raised by the larger-sponge upgrade).
   ctx.beginPath();
   ctx.arc(0, 0, state.spongeRadius, 0, Math.PI * 2);
   ctx.strokeStyle = state.isScrubbing ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.25)';
@@ -794,8 +973,10 @@ function drawSponge() {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // sponge body
-  const w = 46, h = 30;
+  // sponge body - scales with spongeRadius too, so the upgrade visibly
+  // grows the sponge itself, not just its invisible cleaning radius.
+  const w = state.spongeRadius * 1.353;
+  const h = state.spongeRadius * 0.882;
   ctx.fillStyle = '#f2c94c';
   ctx.strokeStyle = '#c9a227';
   ctx.lineWidth = 2;
@@ -806,10 +987,11 @@ function drawSponge() {
   // scrub texture lines
   ctx.strokeStyle = 'rgba(180,140,20,0.6)';
   ctx.lineWidth = 1.5;
+  const lineSpacing = h / 4;
   for (let i = -1; i <= 1; i++) {
     ctx.beginPath();
-    ctx.moveTo(-w / 2 + 4, i * 8);
-    ctx.lineTo(w / 2 - 4, i * 8);
+    ctx.moveTo(-w / 2 + 4, i * lineSpacing);
+    ctx.lineTo(w / 2 - 4, i * lineSpacing);
     ctx.stroke();
   }
 
@@ -832,7 +1014,7 @@ function roundRect(ctx, x, y, w, h, r) {
 function tick() {
   ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
   drawBackground();
-  drawStack();
+  drawStackPile();
 
   const plate = state.activePlate;
   if (plate && !state.animatingPlate) {
@@ -849,7 +1031,7 @@ function tick() {
     drawCleanlinessBar(plate.getDisplayCleanPercent());
   }
 
-  drawRack();
+  drawStacks();
   updateBubbles();
   drawBubbles();
   drawHUD();
@@ -864,13 +1046,17 @@ function tick() {
 // This is where round-to-round progression beyond "one more plate" should
 // plug in. Ideas already accounted for in the structure above:
 //   - UPGRADE_DEFS: add new purchasable entries here, the panel renders them
-//     automatically (name, description, cost, level, buy button). Cost for
-//     each entry doubles per level automatically via upgradeCost().
+//     automatically (name, description, current value, level/max level, buy
+//     button). Cost multiplies by def.costMultiplier per level (default 2x);
+//     def.isMaxed() locks it and shows FULL once that condition is met.
 //   - state.upgrades: purchase counts per upgrade id
 //   - state.platesCleaned: the currency - earned by cleaning plates, spent
 //     via buyUpgrade()
 //   - state.scrubEfficiency: cleaning strength multiplier (efficient sponge)
-//   - state.spongeRadius: brush size (larger sponge)
+//   - state.spongeRadius: brush size AND visual sponge size (larger sponge),
+//     capped at PLATE_RADIUS
+//   - state.rewardMultiplier: currency-per-plate multiplier (plates per
+//     plate); both the speed bonus and the stack-fill bonus scale with it
 //   - baselinePlatesForRound(round) / platesForRound(round): change the
 //     difficulty curve or how the doubling upgrade stacks with it
 //   - Plate class: new plate "types" (grease, baked-on, glass) could subclass
@@ -878,6 +1064,8 @@ function tick() {
 //   - CLEAN_THRESHOLD / COVERAGE_THRESHOLD: could vary per plate type
 //   - currentGoldenChance() / BASE_GOLDEN_CHANCE / GOLD_REWARD: tune golden
 //     plate rarity and payout here
+//   - STACK_CAPACITY / STACK_SLOT_COUNT / STACK_FILL_BONUS_PLATES: tune the
+//     drying-stack layout and payout
 // Nothing below this comment exists yet - build it together, round by round.
 // ============================================================================
 
