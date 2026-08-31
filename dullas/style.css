@@ -15,7 +15,6 @@ html, body {
   width: 100%;
   height: 100%;
   display: flex;
-  flex-direction: column;
 }
 
 #game-area {
@@ -76,135 +75,147 @@ html, body {
   color: #9fd8b8;
 }
 
+/* Hover-hold button: no click needed, matching the canvas upgrade buttons -
+   hovering for a couple of seconds shows a spinning yellow->red pie timer
+   (see #next-round-timer) and then "presses" itself automatically. See the
+   mouseenter/mouseleave handlers in game.js. */
 #next-round-btn {
+  position: relative;
   background: #4caf7d;
   color: #fff;
   border: none;
-  padding: 12px 28px;
+  padding: 12px 40px 12px 28px;
   font-size: 16px;
   font-weight: 600;
   border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.15s ease, transform 0.1s ease;
+  cursor: default;
+  transition: background 0.15s ease, transform 0.1s ease, filter 0.1s ease;
 }
 
-#next-round-btn:hover {
-  background: #5ac48f;
+#next-round-btn.pressed {
+  filter: brightness(0.8);
+  transform: scale(0.96);
 }
 
-#next-round-btn:active {
-  transform: scale(0.97);
+#next-round-timer {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  pointer-events: none;
+}
+
+/* The Upgrades panel now renders directly on the canvas (see
+   drawUpgradesPanel() in game.js) as a box on the left, mirroring the
+   Stacks container on the right - no DOM styling needed for it here. */
+
+/* Generic utility - anything can use this to hide/show itself. */
+.hidden {
+  display: none !important;
 }
 
 /* ---------------------------------------------------------------------- */
-/* Upgrade panel - a horizontal strip under the play area, always open, so */
-/* it shrinks the game area's height instead of covering anything.        */
+/* Splash screen + game-over/statistics screen - both share the same       */
+/* full-viewport overlay treatment, dynamic logo, and copyright line.      */
 /* ---------------------------------------------------------------------- */
 
-#upgrade-panel {
-  flex-shrink: 0;
-  width: 100%;
-  height: min(115px, 17vh);
-  background: rgba(18, 26, 30, 0.96);
-  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.45);
-  color: #fff;
-}
-
-#upgrade-panel-content {
-  width: 100%;
-  height: 100%;
+.overlay-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 8px 18px;
-  box-sizing: border-box;
+  background: radial-gradient(circle at 50% 35%, #3d5866 0%, #24363f 70%, #1a2830 100%);
 }
 
-#upgrade-panel-content h2 {
-  flex-shrink: 0;
-  margin: 0;
+.overlay-content {
+  max-width: 640px;
+  width: 90%;
+  text-align: center;
+  padding: 32px;
+  color: #fff;
+}
+
+.dynamic-logo {
+  margin: 0 0 6px;
+  font-size: 56px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  background: linear-gradient(90deg, #ffd166, #4caf7d, #6fc7ff, #ffd166);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: logo-shimmer 5s ease-in-out infinite;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+}
+
+@keyframes logo-shimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.copyright {
+  margin: 0 0 22px;
   font-size: 13px;
-  color: #ffd166;
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
+  color: #9fb4bd;
 }
 
-#upgrade-list {
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-  gap: 8px;
-  height: 100%;
+.game-summary {
+  margin: 0 0 28px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #dce8ec;
 }
 
-.upgrade-item {
-  flex: 0 0 190px;
-  width: 190px;
-  display: flex;
-  flex-direction: column;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 6px 10px;
-}
-
-.upgrade-item.locked {
-  opacity: 0.5;
-}
-
-.upgrade-item-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 2px;
-}
-
-.upgrade-name {
-  font-weight: 600;
-  font-size: 13px;
-}
-
-.upgrade-level {
-  font-size: 11px;
-  color: #9fd8b8;
-}
-
-/* Hidden in the compact horizontal strip - name + current value + level
-   already convey the upgrade; the full description doesn't fit at this
-   height. Left in the markup in case a roomier layout wants it back. */
-.upgrade-desc {
-  display: none;
-}
-
-.upgrade-meta {
-  margin: 0 0 4px;
-  font-size: 11px;
-  color: #9fd8b8;
-}
-
-.upgrade-buy-btn {
-  margin-top: auto;
-  width: 100%;
+.big-action-btn {
   background: #4caf7d;
   color: #fff;
   border: none;
-  padding: 5px 0;
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 6px;
+  padding: 18px 48px;
+  font-size: 22px;
+  font-weight: 700;
+  border-radius: 12px;
   cursor: pointer;
-  transition: background 0.15s ease;
+  box-shadow: 0 8px 28px rgba(76, 175, 125, 0.4);
+  transition: background 0.15s ease, transform 0.1s ease;
 }
 
-.upgrade-buy-btn:hover:not(:disabled) {
+.big-action-btn:hover {
   background: #5ac48f;
 }
 
-.upgrade-buy-btn:disabled {
-  background: #4a5a56;
-  color: #9aa5a2;
-  cursor: not-allowed;
+.big-action-btn:active {
+  transform: scale(0.97);
+}
+
+#game-over-stats {
+  font-size: 16px;
+  color: #e0e0e0;
+  line-height: 1.8;
+}
+
+#game-over-stats p {
+  margin: 0;
+}
+
+.game-over-upgrades-title {
+  margin-top: 14px !important;
+  font-weight: 600;
+  color: #ffd166;
+}
+
+.game-over-upgrades-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  font-size: 14px;
+  color: #cfe8ff;
 }

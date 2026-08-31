@@ -43,38 +43,25 @@ const roundCompleteCleaned = document.getElementById('round-complete-cleaned');
 const roundCompleteEarned = document.getElementById('round-complete-earned');
 const roundCompleteBonus = document.getElementById('round-complete-bonus');
 const nextRoundBtn = document.getElementById('next-round-btn');
-const nextRoundTimerEl = document.getElementById('next-round-timer');
 
-const splashScreen = document.getElementById('splash-screen');
-const startWashingBtn = document.getElementById('start-washing-btn');
-const gameOverScreen = document.getElementById('game-over-screen');
-const gameOverReasonEl = document.getElementById('game-over-reason');
-const gameOverStatsEl = document.getElementById('game-over-stats');
+const upgradeListEl = document.getElementById('upgrade-list');
 
 const CANVAS_W = canvas.width;
 const CANVAS_H = canvas.height;
-// Kept short enough to clear the Stacks container's top edge (see
-// STACK_CONTAINER.y below, computed at CANVAS_H - 20 - STACK_CONTAINER.h)
-// so the two never overlap.
-const HUD_HEIGHT = 88;
-
-const MAX_ROUNDS = 35; // the game ends after this round, or sooner if every upgrade maxes out first
+const HUD_HEIGHT = 90;
 
 // Fixed plate size and position for every round - plates never shrink as
-// rounds add more of them. Horizontally centred in the canvas now that the
-// upgrades sidebar lives outside the play area rather than inside it.
+// rounds add more of them.
 const PLATE_RADIUS = 211;
-const ACTIVE_X = CANVAS_W / 2;
+const ACTIVE_X = 260;
 const ACTIVE_Y = 350;
 
 // The dirty-plate pile behind the active plate: every waiting plate is
 // drawn, but its peek-out distance is capped well under PLATE_RADIUS so
 // even the very last (farthest) plate's centre stays inside the active
 // plate's own circle, and comfortably on-screen (and clear of the drying
-// stacks' container over on the right - see the STACK_CONTAINER block
-// below; with the plate now centred, that container is the tighter of the
-// two constraints, so this is capped to fit it exactly).
-const STACK_MAX_OFFSET = 60;
+// stacks' container over on the right).
+const STACK_MAX_OFFSET = 90;
 
 // ----------------------------------------------------------------------------
 // Drying stacks (formerly "racks"): one shared container in the bottom-right
@@ -97,11 +84,8 @@ STACK_CONTAINER.x = CANVAS_W - 20 - STACK_CONTAINER.w;
 STACK_CONTAINER.y = CANVAS_H - 20 - STACK_CONTAINER.h;
 const STACK_BASE_Y = STACK_CONTAINER.y + STACK_CONTAINER.h - 20;
 
-// Flipped horizontally so slot 0 (the first/oldest visible stack) sits at
-// the RIGHT edge of the container and later slots run leftward - stacks
-// fill up from the right first.
 function stackColumnX(slot) {
-  return STACK_CONTAINER.x + STACK_CONTAINER.w - STACK_COLUMN_WIDTH * (slot + 1);
+  return STACK_CONTAINER.x + STACK_COLUMN_WIDTH * slot;
 }
 function stackPlatePosition(stackIndex, plateIndexInStack) {
   return {
@@ -124,80 +108,8 @@ function ensureStackSpace() {
     const bonus = STACK_FILL_BONUS_PLATES * NORMAL_REWARD * state.rewardMultiplier;
     state.platesCleaned += bonus;
     state.roundCurrencyEarned += bonus;
-    state.stackBonusPopup = {
-      text: `+${bonus} plates`,
-      startTime: performance.now(),
-      duration: 2500,
-    };
+    renderUpgradePanel();
   }
-}
-
-// ----------------------------------------------------------------------------
-// Upgrades panel: drawn directly on the canvas as a box on the LEFT of the
-// play area, mirroring the Stacks container's position/size on the right
-// (same width/height/y, reflected across the canvas). No DOM buttons - each
-// upgrade has a "buy button" hit-region; hovering it (no clicking needed,
-// consistent with the rest of the game) for UPGRADE_HOVER_HOLD_MS shows a
-// small pie timer spinning yellow->red, then auto-triggers the purchase
-// and restarts if the player keeps hovering. See updateUpgradeHover() and
-// drawUpgradesPanel() further down.
-// ----------------------------------------------------------------------------
-const UPGRADE_HOVER_HOLD_MS = 2000;
-const UPGRADE_CONTAINER = { w: STACK_CONTAINER.w, h: STACK_CONTAINER.h, y: STACK_CONTAINER.y };
-UPGRADE_CONTAINER.x = CANVAS_W - (STACK_CONTAINER.x + STACK_CONTAINER.w); // mirror of STACK_CONTAINER.x
-
-const UPGRADE_HEADING_H = 30;
-const UPGRADE_ITEM_PAD = 8;
-const UPGRADE_ITEM_GAP = 6;
-
-function upgradeItemHeight() {
-  const count = UPGRADE_DEFS.length;
-  const available = UPGRADE_CONTAINER.h - UPGRADE_HEADING_H - UPGRADE_ITEM_PAD * 2 - UPGRADE_ITEM_GAP * (count - 1);
-  return available / count;
-}
-function upgradeItemRect(index) {
-  const itemH = upgradeItemHeight();
-  return {
-    x: UPGRADE_CONTAINER.x + UPGRADE_ITEM_PAD,
-    y: UPGRADE_CONTAINER.y + UPGRADE_HEADING_H + UPGRADE_ITEM_PAD + index * (itemH + UPGRADE_ITEM_GAP),
-    w: UPGRADE_CONTAINER.w - UPGRADE_ITEM_PAD * 2,
-    h: itemH,
-  };
-}
-// The clickable (well, hoverable) "Buy" region within an upgrade card - the
-// bottom third of the card.
-function upgradeButtonRect(index) {
-  const item = upgradeItemRect(index);
-  const btnH = 22;
-  return { x: item.x + 3, y: item.y + item.h - btnH - 4, w: item.w - 6, h: btnH };
-}
-
-// Picks the largest font size (down to minSize) that still fits `text`
-// within maxWidth, so upgrade item/button text renders as large as
-// possible without overflowing its box regardless of how long a
-// particular upgrade's label happens to be. Leaves ctx.font set to the
-// chosen size (bold if requested) as a side effect, ready to draw with.
-function fittedFontSize(text, maxWidth, maxSize, minSize, bold = false) {
-  let size = maxSize;
-  while (size > minSize) {
-    ctx.font = `${bold ? 'bold ' : ''}${size}px Segoe UI, Arial, sans-serif`;
-    if (ctx.measureText(text).width <= maxWidth) break;
-    size -= 1;
-  }
-  return size;
-}
-
-// Simple RGB lerp between two "#rrggbb" colours - used for the hover
-// timer's yellow -> red fill.
-function lerpColor(hexA, hexB, t) {
-  const a = parseInt(hexA.slice(1), 16);
-  const b = parseInt(hexB.slice(1), 16);
-  const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
-  const br = (b >> 16) & 0xff, bg = (b >> 8) & 0xff, bb = b & 0xff;
-  const r = Math.round(ar + (br - ar) * t);
-  const g = Math.round(ag + (bg - ag) * t);
-  const bl = Math.round(ab + (bb - ab) * t);
-  return `rgb(${r},${g},${bl})`;
 }
 
 const CLEAN_THRESHOLD = 0.95; // average grime remaining must drop below this
@@ -245,18 +157,6 @@ function formatMinSec(ms) {
   const mins = Math.floor(totalSeconds / 60);
   const secs = totalSeconds % 60;
   return `${mins}m ${secs}s`;
-}
-
-// Plates cleaned in the last real-time (game-clock) minute: trims
-// state.washTimestamps to the trailing 60s window every time it's read, so
-// it stays accurate no matter how long the session has been running.
-function getPlatesPerMinute() {
-  const now = performance.now();
-  const cutoff = now - 60000;
-  while (state.washTimestamps.length && state.washTimestamps[0] < cutoff) {
-    state.washTimestamps.shift();
-  }
-  return state.washTimestamps.length;
 }
 
 // ----------------------------------------------------------------------------
@@ -553,19 +453,6 @@ const state = {
   totalPlatesWashed: 0, // lifetime count of actual plates washed this session (never spent)
   goldenPlatesWashed: 0, // lifetime count of golden plates specifically - subset of totalPlatesWashed
   upgrades: {}, // purchase counts per upgrade id, e.g. { largerSponge: 2 }
-  totalPlatesSpent: 0, // lifetime currency spent on upgrades, see buyUpgrade()
-
-  gameStarted: false, // true once the player clicks "Start Washing" on the splash screen
-  gameOver: false, // true once the end/statistics screen is showing
-  roundFinalElapsedMs: null, // elapsed time frozen at the moment the round ended, for the timer pie chart
-  roundFinalBonusEarned: false, // whether the speed bonus was earned, frozen alongside roundFinalElapsedMs
-  washTimestamps: [], // performance.now() of every plate wash, trimmed to the last 60s - see getPlatesPerMinute()
-  clickCount: 0, // mousedown-on-canvas count for the anti-click penalty mechanic
-  stackBonusPopup: null, // { text, startTime, duration } fading bubble shown when a stack fills, see ensureStackSpace()
-  warningPopup: null, // { text, startTime, duration } fading "don't click" banner, see the mousedown handler
-
-  upgradeHover: null, // { id, index, startTime } - which buy button is currently being hovered, see updateUpgradeHover()
-  upgradePressFlash: null, // { id, startTime, duration } brief "pressed" flash once a hover-buy triggers
 };
 
 // ----------------------------------------------------------------------------
@@ -587,14 +474,7 @@ const UPGRADE_DEFS = [
     maxLevel: 11,
     apply: () => { state.spongeRadius = Math.min(PLATE_RADIUS, state.spongeRadius * 1.2); },
     isMaxed: () => (state.upgrades.largerSponge || 0) >= 11,
-    // Recomputed from the level (rather than reading the mutated
-    // state.spongeRadius directly) so the buy button can preview the
-    // post-purchase value by passing levelOverride = level + 1.
-    currentValueLabel: (levelOverride) => {
-      const lvl = levelOverride != null ? levelOverride : (state.upgrades.largerSponge || 0);
-      const radius = Math.min(PLATE_RADIUS, 34 * Math.pow(1.2, lvl));
-      return `${Math.round((radius / PLATE_RADIUS) * 100)}% of plate size`;
-    },
+    currentValueLabel: () => `${Math.round((state.spongeRadius / PLATE_RADIUS) * 100)}% of plate size`,
   },
   {
     id: 'efficientSponge',
@@ -607,23 +487,16 @@ const UPGRADE_DEFS = [
     // that actually drives how much grime a stroke removes (see Plate.scrubAt).
     apply: () => { state.scrubEfficiency += 0.2; },
     isMaxed: () => (state.upgrades.efficientSponge || 0) >= 10,
-    currentValueLabel: (levelOverride) => {
-      const lvl = levelOverride != null ? levelOverride : (state.upgrades.efficientSponge || 0);
-      return `${lvl * 10}%`;
-    },
+    currentValueLabel: () => `${(state.upgrades.efficientSponge || 0) * 10}%`,
   },
   {
     id: 'doublePlates',
     name: 'Extra Dishes',
     description: 'Doubles the number of plates each round (from next round on)',
     baseCost: 50,
-    maxLevel: 10,
+    maxLevel: null,
     apply: () => { /* platesForRound() reads state.upgrades.doublePlates directly */ },
-    isMaxed: () => (state.upgrades.doublePlates || 0) >= 10,
-    currentValueLabel: (levelOverride) => {
-      const lvl = levelOverride != null ? levelOverride : (state.upgrades.doublePlates || 0);
-      return `${Math.pow(2, lvl)}x plates/round`;
-    },
+    currentValueLabel: () => `${Math.pow(2, state.upgrades.doublePlates || 0)}x plates/round`,
   },
   {
     id: 'goldenBoost',
@@ -633,11 +506,7 @@ const UPGRADE_DEFS = [
     maxLevel: 10,
     apply: () => { /* currentGoldenChance() reads state.upgrades.goldenBoost directly */ },
     isMaxed: () => (state.upgrades.goldenBoost || 0) >= 10,
-    currentValueLabel: (levelOverride) => {
-      const lvl = levelOverride != null ? levelOverride : (state.upgrades.goldenBoost || 0);
-      const chance = Math.min(GOLDEN_CHANCE_CAP, BASE_GOLDEN_CHANCE + lvl * GOLDEN_CHANCE_PER_LEVEL);
-      return `${Math.round(chance * 100)}% golden chance`;
-    },
+    currentValueLabel: () => `${Math.round(currentGoldenChance() * 100)}% golden chance`,
   },
   {
     id: 'platesPerPlate',
@@ -648,10 +517,7 @@ const UPGRADE_DEFS = [
     maxLevel: 11,
     apply: () => { state.rewardMultiplier *= 2; },
     isMaxed: () => (state.upgrades.platesPerPlate || 0) >= 11,
-    currentValueLabel: (levelOverride) => {
-      const lvl = levelOverride != null ? levelOverride : (state.upgrades.platesPerPlate || 0);
-      return `${Math.pow(2, lvl)}x plates/plate`;
-    },
+    currentValueLabel: () => `${state.rewardMultiplier}x plates/plate`,
   },
 ];
 
@@ -666,9 +532,9 @@ function buyUpgrade(def, index) {
   const cost = upgradeCost(def);
   if (state.platesCleaned < cost) return false;
   state.platesCleaned -= cost;
-  state.totalPlatesSpent += cost;
   state.upgrades[def.id] = (state.upgrades[def.id] || 0) + 1;
   def.apply();
+  renderUpgradePanel();
   return true;
 }
 
@@ -682,58 +548,51 @@ function isUpgradeUnlocked(index) {
   return (state.upgrades[prevDef.id] || 0) >= 1;
 }
 
-// True once every upgrade that has a maxLevel/isMaxed() has actually hit it -
-// one of the two win conditions for the game (the other is finishing round
-// MAX_ROUNDS). Upgrades with no cap (none currently) would never satisfy
-// this, so this only fires once the whole capped upgrade tree is exhausted.
-function allUpgradesMaxed() {
-  return UPGRADE_DEFS.every((def) => def.isMaxed && def.isMaxed());
-}
+function renderUpgradePanel() {
+  upgradeListEl.innerHTML = '';
+  UPGRADE_DEFS.forEach((def, index) => {
+    const unlocked = isUpgradeUnlocked(index);
+    const level = state.upgrades[def.id] || 0;
+    const cost = upgradeCost(def);
+    const maxed = def.isMaxed ? def.isMaxed() : false;
+    const affordable = unlocked && !maxed && state.platesCleaned >= cost;
+    const maxLevelLabel = def.maxLevel != null ? def.maxLevel : '∞';
 
-// Which (if any) upgrade's buy button the mouse currently sits over - only
-// unlocked, non-maxed, affordable buttons are hoverable/purchasable at all,
-// matching what would previously have been an enabled DOM button.
-function getHoveredBuyableUpgradeIndex() {
-  for (let i = 0; i < UPGRADE_DEFS.length; i++) {
-    const def = UPGRADE_DEFS[i];
-    if (!isUpgradeUnlocked(i)) continue;
-    if (def.isMaxed && def.isMaxed()) continue;
-    if (state.platesCleaned < upgradeCost(def)) continue;
-    const btn = upgradeButtonRect(i);
-    if (
-      state.mouseX >= btn.x && state.mouseX <= btn.x + btn.w &&
-      state.mouseY >= btn.y && state.mouseY <= btn.y + btn.h
-    ) {
-      return i;
+    const item = document.createElement('div');
+    item.className = 'upgrade-item' + (unlocked ? '' : ' locked');
+
+    const header = document.createElement('div');
+    header.className = 'upgrade-item-header';
+    header.innerHTML = `<span class="upgrade-name">${def.name}</span><span class="upgrade-level">Lv. ${level} / ${maxLevelLabel}</span>`;
+
+    const desc = document.createElement('p');
+    desc.className = 'upgrade-desc';
+    desc.textContent = def.description;
+
+    const meta = document.createElement('p');
+    meta.className = 'upgrade-meta';
+    meta.textContent = `Current: ${def.currentValueLabel()}`;
+
+    const btn = document.createElement('button');
+    btn.className = 'upgrade-buy-btn';
+    if (!unlocked) {
+      btn.textContent = 'Locked';
+      btn.disabled = true;
+    } else if (maxed) {
+      btn.textContent = 'FULL';
+      btn.disabled = true;
+    } else {
+      btn.textContent = `Buy - ${cost} plates`;
+      btn.disabled = !affordable;
+      btn.addEventListener('click', () => buyUpgrade(def, index));
     }
-  }
-  return -1;
-}
 
-// No clicking needed here either: hovering a buy button for
-// UPGRADE_HOVER_HOLD_MS "depresses" it exactly as a click would, then keeps
-// going (repeat-buying) for as long as the player keeps hovering.
-function updateUpgradeHover() {
-  if (!state.gameStarted || state.gameOver) {
-    state.upgradeHover = null;
-    return;
-  }
-  const hoveredIndex = getHoveredBuyableUpgradeIndex();
-  if (hoveredIndex === -1) {
-    state.upgradeHover = null;
-    return;
-  }
-  const def = UPGRADE_DEFS[hoveredIndex];
-  if (!state.upgradeHover || state.upgradeHover.id !== def.id) {
-    state.upgradeHover = { id: def.id, index: hoveredIndex, startTime: performance.now() };
-    return;
-  }
-  const elapsed = performance.now() - state.upgradeHover.startTime;
-  if (elapsed >= UPGRADE_HOVER_HOLD_MS) {
-    buyUpgrade(def, hoveredIndex);
-    state.upgradePressFlash = { id: def.id, startTime: performance.now(), duration: 180 };
-    state.upgradeHover.startTime = performance.now(); // restart - holding keeps buying
-  }
+    item.appendChild(header);
+    item.appendChild(desc);
+    item.appendChild(meta);
+    item.appendChild(btn);
+    upgradeListEl.appendChild(item);
+  });
 }
 
 // Random peek-out offset for each dirty plate waiting under the active one.
@@ -766,8 +625,6 @@ function startRound(roundNum) {
   state.animatingPlate = null;
   state.activePlate = new Plate(ACTIVE_X, ACTIVE_Y, PLATE_RADIUS, Math.random() < currentGoldenChance());
   state.roundComplete = false;
-  state.roundFinalElapsedMs = null;
-  state.roundFinalBonusEarned = false;
   roundCompletePanel.classList.add('hidden');
 }
 
@@ -783,103 +640,21 @@ function onRoundComplete() {
   if (bonusAmount > 0) {
     state.platesCleaned += bonusAmount;
     state.roundCurrencyEarned += bonusAmount;
-  }
-
-  // Freeze the pie-chart timer exactly where it stood at round end, so it
-  // stops ticking but still shows green/red per whether the bonus landed.
-  state.roundFinalElapsedMs = elapsed;
-  state.roundFinalBonusEarned = bonusEarned;
-
-  // Two win conditions, whichever comes first: finishing MAX_ROUNDS, or
-  // maxing out every capped upgrade. Show the game-over/stats screen
-  // instead of the usual round-complete panel when either is met.
-  if (state.round >= MAX_ROUNDS || allUpgradesMaxed()) {
-    const reason = state.round >= MAX_ROUNDS
-      ? `You completed all ${MAX_ROUNDS} rounds!`
-      : 'You maxed out every upgrade!';
-    showGameOverScreen(reason);
-    return;
+    renderUpgradePanel();
   }
 
   roundCompleteTitle.textContent = `Round ${state.round} Complete!`;
   roundCompleteCleaned.textContent = `Plates cleaned this round: ${state.roundPlatesWashed}`;
   roundCompleteEarned.textContent = `Plates earned this round: ${state.roundCurrencyEarned}`;
   roundCompleteBonus.textContent = bonusEarned
-    ? `⏱ Finished in ${formatDuration(elapsed)} - Speed bonus: +${bonusAmount} plates! (target: ${formatMinSec(timeLimitMs)})`
-    : `⏱ Finished in ${formatDuration(elapsed)} - too slow for the speed bonus (target: ${formatMinSec(timeLimitMs)})`;
+    ? `⏱ Finished in ${formatDuration(elapsed)} - Speed bonus: +${bonusAmount} plates! (target: under ${formatMinSec(timeLimitMs)})`
+    : `⏱ Finished in ${formatDuration(elapsed)} - too slow for the speed bonus (target: under ${formatMinSec(timeLimitMs)})`;
   roundCompletePanel.classList.remove('hidden');
 }
 
-// Shows the shared end screen (same dynamic logo + copyright as the splash
-// screen) with a short reason and a handful of lifetime stats. Reused both
-// for a normal win (round 35 / all upgrades maxed) and for the anti-click
-// forced exit.
-function showGameOverScreen(reason) {
-  state.gameOver = true;
-  state.roundComplete = true;
-  state.activePlate = null;
-  state.animatingPlate = null;
-  roundCompletePanel.classList.add('hidden');
-
-  // Only list upgrades actually bought at least once, in the same order
-  // they appear in the upgrade panel.
-  const purchasedLines = UPGRADE_DEFS
-    .filter((def) => (state.upgrades[def.id] || 0) > 0)
-    .map((def) => `<li>${def.name}: Lv. ${state.upgrades[def.id]}${def.maxLevel != null ? ` / ${def.maxLevel}` : ''}</li>`)
-    .join('');
-
-  gameOverReasonEl.textContent = reason;
-  gameOverStatsEl.innerHTML = `
-    <p>Rounds completed: ${state.round - (state.roundComplete ? 0 : 1)}</p>
-    <p>Total Plates Cleaned: ${state.totalPlatesWashed}</p>
-    <p>Golden Plates Cleaned: ${state.goldenPlatesWashed}</p>
-    <p>Plates currency remaining: ${state.platesCleaned}</p>
-    <p>Total Plates Spent on Upgrades: ${state.totalPlatesSpent}</p>
-    <p class="game-over-upgrades-title">Upgrades Purchased:</p>
-    <ul class="game-over-upgrades-list">${purchasedLines || '<li>None</li>'}</ul>
-  `;
-  gameOverScreen.classList.remove('hidden');
-}
-
-// Hover-hold, same as the canvas upgrade buttons: no click needed. This
-// button lives in the HTML round-complete panel rather than the canvas, so
-// the spinning timer is a small DOM overlay (conic-gradient) instead of a
-// canvas-drawn pie, but it reuses the same hold duration and colour lerp.
-let nextRoundHoverStart = null;
-let nextRoundHoverRAF = null;
-
-function cancelNextRoundHover() {
-  nextRoundHoverStart = null;
-  if (nextRoundHoverRAF != null) {
-    cancelAnimationFrame(nextRoundHoverRAF);
-    nextRoundHoverRAF = null;
-  }
-  nextRoundTimerEl.style.background = 'rgba(0, 0, 0, 0.35)';
-}
-
-function updateNextRoundHoverVisual() {
-  if (nextRoundHoverStart == null) return;
-  const elapsed = performance.now() - nextRoundHoverStart;
-  const frac = Math.min(1, elapsed / UPGRADE_HOVER_HOLD_MS);
-  const col = lerpColor(UPGRADE_TIMER_YELLOW, UPGRADE_TIMER_RED, frac);
-  nextRoundTimerEl.style.background =
-    `conic-gradient(${col} ${frac * 360}deg, rgba(0,0,0,0.35) ${frac * 360}deg)`;
-
-  if (frac >= 1) {
-    cancelNextRoundHover();
-    nextRoundBtn.classList.add('pressed');
-    setTimeout(() => nextRoundBtn.classList.remove('pressed'), 180);
-    startRound(state.round + 1);
-    return;
-  }
-  nextRoundHoverRAF = requestAnimationFrame(updateNextRoundHoverVisual);
-}
-
-nextRoundBtn.addEventListener('mouseenter', () => {
-  nextRoundHoverStart = performance.now();
-  nextRoundHoverRAF = requestAnimationFrame(updateNextRoundHoverVisual);
+nextRoundBtn.addEventListener('click', () => {
+  startRound(state.round + 1);
 });
-nextRoundBtn.addEventListener('mouseleave', cancelNextRoundHover);
 
 // Kicks off the fly-to-stack animation for a just-cleaned plate. The plate
 // object is reused (repositioned each frame) purely for drawing; once the
@@ -924,8 +699,8 @@ function updatePlateAnimation() {
     if (anim.plate.isGolden) state.goldenPlatesWashed += 1;
     state.roundPlatesWashed += 1;
     state.roundCurrencyEarned += reward;
-    state.washTimestamps.push(performance.now());
     state.stacks[anim.targetStackIndex].push(anim.plate.isGolden);
+    renderUpgradePanel();
 
     if (state.stackRemaining > 0) {
       state.stackRemaining -= 1;
@@ -954,7 +729,6 @@ function getCanvasCoords(clientX, clientY) {
 // scrubs it. `isScrubbing` is kept only as a "sponge is on the board" flag
 // for the visual indicator, not as a gate on cleaning.
 function handleMove(x, y) {
-  if (!state.gameStarted || state.gameOver) return;
   state.mouseX = x;
   state.mouseY = y;
   state.isScrubbing = true;
@@ -983,27 +757,6 @@ canvas.addEventListener('touchmove', (e) => {
   handleMove(x, y);
 }, { passive: false });
 window.addEventListener('touchend', () => { state.isScrubbing = false; });
-
-// Anti-click penalty: the game is a hover-only, no-click interaction - the
-// canvas has no mousedown-driven behaviour of its own, so any mousedown here
-// can only be the player pressing a button out of habit. Legitimate UI
-// (upgrade "Buy" buttons, "Next Round") lives in separate DOM elements
-// outside the canvas and is unaffected. Escalates after repeated clicks and
-// forces a game-over on the 6th.
-canvas.addEventListener('mousedown', () => {
-  if (!state.gameStarted || state.gameOver) return;
-  state.clickCount += 1;
-
-  if (state.clickCount >= 6) {
-    showGameOverScreen('You were exited from the game for repeatedly clicking!');
-    return;
-  }
-
-  const text = state.clickCount >= 5
-    ? "Don't Press The Buttons - save the mouse.\nYou will be exited from the game if you continue!"
-    : "Don't Press The Buttons - save the mouse.";
-  state.warningPopup = { text, startTime: performance.now(), duration: 2200 };
-});
 
 // ----------------------------------------------------------------------------
 // Suds particles (purely cosmetic feedback while scrubbing)
@@ -1141,156 +894,13 @@ function drawStacks() {
   });
 }
 
-// Upgrades box on the left, mirroring drawStacks()'s container on the
-// right. Each card shows name / level / current value plus a "Buy" button;
-// buttons are hovered (not clicked) to purchase - see drawUpgradeButton().
-function drawUpgradesPanel() {
-  ctx.save();
-  ctx.fillStyle = 'rgba(0,0,0,0.2)';
-  ctx.fillRect(UPGRADE_CONTAINER.x, UPGRADE_CONTAINER.y, UPGRADE_CONTAINER.w, UPGRADE_CONTAINER.h);
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-  ctx.strokeRect(UPGRADE_CONTAINER.x, UPGRADE_CONTAINER.y, UPGRADE_CONTAINER.w, UPGRADE_CONTAINER.h);
-
-  ctx.fillStyle = '#e8f4ff';
-  ctx.font = 'bold 13px Segoe UI, Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('Upgrades', UPGRADE_CONTAINER.x + UPGRADE_CONTAINER.w / 2, UPGRADE_CONTAINER.y + 16);
-  ctx.textAlign = 'left';
-  ctx.restore();
-
-  UPGRADE_DEFS.forEach((def, index) => {
-    const item = upgradeItemRect(index);
-    const unlocked = isUpgradeUnlocked(index);
-    const level = state.upgrades[def.id] || 0;
-    const cost = upgradeCost(def);
-    const maxed = def.isMaxed ? def.isMaxed() : false;
-    const affordable = unlocked && !maxed && state.platesCleaned >= cost;
-    const maxLevelLabel = def.maxLevel != null ? def.maxLevel : '∞';
-
-    ctx.save();
-    ctx.fillStyle = 'rgba(255,255,255,0.06)';
-    roundRect(ctx, item.x, item.y, item.w, item.h, 6);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-    ctx.lineWidth = 1;
-    roundRect(ctx, item.x, item.y, item.w, item.h, 6);
-    ctx.stroke();
-
-    const textX = item.x + 8;
-    const textMaxWidth = item.w - 16;
-
-    ctx.globalAlpha = unlocked ? 1 : 0.5;
-    ctx.textAlign = 'left';
-
-    fittedFontSize(def.name, textMaxWidth, 14, 9, true);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(def.name, textX, item.y + 17);
-
-    const levelText = `Lv. ${level} / ${maxLevelLabel}`;
-    fittedFontSize(levelText, textMaxWidth, 12, 8, false);
-    ctx.fillStyle = '#9fd8b8';
-    ctx.fillText(levelText, textX, item.y + 35);
-
-    const currentText = `Current: ${def.currentValueLabel()}`;
-    fittedFontSize(currentText, textMaxWidth, 12, 8, false);
-    ctx.fillStyle = '#cfe0d8';
-    ctx.fillText(currentText, textX, item.y + 53);
-    ctx.globalAlpha = 1;
-    ctx.restore();
-
-    const btn = upgradeButtonRect(index);
-    let label, kind;
-    if (!unlocked) {
-      label = 'Locked'; kind = 'locked';
-    } else if (maxed) {
-      label = 'FULL'; kind = 'full';
-    } else {
-      // Previews the value one more purchase would give (level + 1), so
-      // the player sees what they're actually about to buy, not just the
-      // current level's value repeated.
-      label = `Buy ${def.currentValueLabel(level + 1)} for ${cost} plates`;
-      kind = affordable ? 'buy' : 'unaffordable';
-    }
-    drawUpgradeButton(def, index, btn, label, kind);
-  });
-}
-
-// Draws one upgrade's buy button, plus (if it's the one currently being
-// hovered) the spinning yellow->red hold timer, and a brief darkened
-// "pressed" flash right after it fires.
-const UPGRADE_TIMER_YELLOW = '#ffd166';
-const UPGRADE_TIMER_RED = '#e05252';
-function drawUpgradeButton(def, index, rect, label, kind) {
-  const pressed = state.upgradePressFlash
-    && state.upgradePressFlash.id === def.id
-    && (performance.now() - state.upgradePressFlash.startTime) < state.upgradePressFlash.duration;
-
-  let bg = '#4a5a56';
-  let fg = '#9aa5a2';
-  if (kind === 'buy') { bg = pressed ? '#3d8f66' : '#4caf7d'; fg = '#ffffff'; }
-  else if (kind === 'unaffordable') { bg = '#3a4a46'; fg = '#8fa39c'; }
-
-  // Buyable buttons show the hover timer circle at their right edge, so
-  // reserve room for it and shift the (center-aligned) label left to match.
-  const reserveRight = (kind === 'buy' || kind === 'unaffordable') ? 20 : 0;
-  const centerX = rect.x + (rect.w - reserveRight) / 2;
-
-  ctx.save();
-  ctx.fillStyle = bg;
-  roundRect(ctx, rect.x, rect.y, rect.w, rect.h, 5);
-  ctx.fill();
-  fittedFontSize(label, rect.w - 10 - reserveRight, 11, 7, true);
-  ctx.fillStyle = fg;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(label, centerX, rect.y + rect.h / 2 + 1);
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'alphabetic';
-  ctx.restore();
-
-  if (kind === 'buy' && state.upgradeHover && state.upgradeHover.index === index) {
-    const elapsed = performance.now() - state.upgradeHover.startTime;
-    const frac = Math.min(1, elapsed / UPGRADE_HOVER_HOLD_MS);
-    const cx = rect.x + rect.w - 12, cy = rect.y + rect.h / 2, r = 8;
-    const col = lerpColor(UPGRADE_TIMER_YELLOW, UPGRADE_TIMER_RED, frac);
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.fill();
-    if (frac > 0) {
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
-      ctx.closePath();
-      ctx.fillStyle = col;
-      ctx.fill();
-    }
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.restore();
-  }
-}
-
 // Small pie-chart clock showing elapsed round time as a fraction of the
 // speed-bonus time limit: green while the bonus is still reachable, red
 // once the pie fills all the way round (the window has closed).
 function drawRoundTimer() {
   const timeLimitMs = state.roundTotalPlates * TIME_BONUS_SECONDS_PER_PLATE * 1000;
-  // Once the round has ended, stop ticking and hold at the frozen elapsed
-  // time captured in onRoundComplete() - green/red still reflects whether
-  // the speed bonus was actually earned, not just whether the pie is full.
-  const elapsed = state.roundComplete && state.roundFinalElapsedMs != null
-    ? state.roundFinalElapsedMs
-    : performance.now() - state.roundStartTime;
+  const elapsed = performance.now() - state.roundStartTime;
   const fraction = timeLimitMs > 0 ? Math.min(1, elapsed / timeLimitMs) : 1;
-  const frozenColorOverride = state.roundComplete && state.roundFinalElapsedMs != null
-    ? (state.roundFinalBonusEarned ? '#4caf7d' : '#e05252')
-    : null;
   const cx = 45, cy = HUD_HEIGHT / 2, r = 26;
 
   ctx.save();
@@ -1305,7 +915,7 @@ function drawRoundTimer() {
     ctx.moveTo(cx, cy);
     ctx.arc(cx, cy, r, startAngle, startAngle + fraction * Math.PI * 2);
     ctx.closePath();
-    ctx.fillStyle = frozenColorOverride || (fraction >= 1 ? '#e05252' : '#4caf7d');
+    ctx.fillStyle = fraction >= 1 ? '#e05252' : '#4caf7d';
     ctx.fill();
   }
 
@@ -1327,7 +937,7 @@ function drawHUD() {
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 22px Segoe UI, Arial, sans-serif';
   ctx.textBaseline = 'middle';
-  ctx.fillText(`Round ${state.round} / ${MAX_ROUNDS}`, 85, HUD_HEIGHT / 2 - 12);
+  ctx.fillText(`Round ${state.round}`, 85, HUD_HEIGHT / 2 - 12);
   ctx.font = '15px Segoe UI, Arial, sans-serif';
   ctx.fillStyle = '#cfd8dc';
   const dirtyCount = state.stackRemaining + (state.activePlate ? 1 : 0);
@@ -1336,98 +946,15 @@ function drawHUD() {
   ctx.textAlign = 'center';
   ctx.font = 'bold 16px Segoe UI, Arial, sans-serif';
   ctx.fillStyle = '#ffffff';
-  ctx.fillText(`Total Plates Cleaned: ${state.totalPlatesWashed}`, CANVAS_W / 2, HUD_HEIGHT / 2 - 22);
+  ctx.fillText(`Total Plates Cleaned: ${state.totalPlatesWashed}`, CANVAS_W / 2, HUD_HEIGHT / 2 - 12);
   ctx.font = '13px Segoe UI, Arial, sans-serif';
   ctx.fillStyle = '#ffd54f';
-  ctx.fillText(`Golden Plates Cleaned: ${state.goldenPlatesWashed}`, CANVAS_W / 2, HUD_HEIGHT / 2);
-  ctx.fillStyle = '#9fd8b8';
-  ctx.fillText(`Current Plates / Minute: ${getPlatesPerMinute()}`, CANVAS_W / 2, HUD_HEIGHT / 2 + 20);
+  ctx.fillText(`Golden Plates Cleaned: ${state.goldenPlatesWashed}`, CANVAS_W / 2, HUD_HEIGHT / 2 + 12);
 
   ctx.textAlign = 'right';
   ctx.font = 'bold 22px Segoe UI, Arial, sans-serif';
   ctx.fillStyle = '#ffd166';
   ctx.fillText(`Plates: ${state.platesCleaned}`, CANVAS_W - 20, HUD_HEIGHT / 2);
-  ctx.textAlign = 'left';
-  ctx.restore();
-}
-
-// Fading "Stack Completion Bonus" bubble, shown floating over the stack
-// container whenever ensureStackSpace() pays one out. Purely cosmetic -
-// state.stackBonusPopup is cleared once its duration elapses.
-function drawStackBonusPopup() {
-  const popup = state.stackBonusPopup;
-  if (!popup) return;
-  const elapsed = performance.now() - popup.startTime;
-  if (elapsed >= popup.duration) {
-    state.stackBonusPopup = null;
-    return;
-  }
-  const alpha = 1 - elapsed / popup.duration;
-  const cx = STACK_CONTAINER.x + STACK_CONTAINER.w / 2;
-  const cy = STACK_CONTAINER.y - 18;
-
-  ctx.save();
-  ctx.globalAlpha = Math.max(0, alpha);
-  ctx.font = 'bold 13px Segoe UI, Arial, sans-serif';
-  const title = 'Stack Completion Bonus!';
-  const titleW = ctx.measureText(title).width;
-  const bodyW = ctx.measureText(popup.text).width;
-  const boxW = Math.max(titleW, bodyW) + 24;
-  const boxH = 44;
-  ctx.fillStyle = 'rgba(20, 30, 35, 0.9)';
-  roundRect(ctx, cx - boxW / 2, cy - boxH, boxW, boxH, 8);
-  ctx.fill();
-  ctx.strokeStyle = '#ffd166';
-  ctx.lineWidth = 1.5;
-  roundRect(ctx, cx - boxW / 2, cy - boxH, boxW, boxH, 8);
-  ctx.stroke();
-
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#ffd166';
-  ctx.fillText(title, cx, cy - boxH + 17);
-  ctx.font = '12px Segoe UI, Arial, sans-serif';
-  ctx.fillStyle = '#e0e0e0';
-  ctx.fillText(popup.text, cx, cy - boxH + 34);
-  ctx.textAlign = 'left';
-  ctx.restore();
-}
-
-// Fading "Don't Press The Buttons" warning banner, shown when the player
-// clicks the canvas - see the mousedown listener below for the escalation
-// rules (extra line after 4 clicks, forced game-over on the 6th).
-function drawWarningPopup() {
-  const popup = state.warningPopup;
-  if (!popup) return;
-  const elapsed = performance.now() - popup.startTime;
-  if (elapsed >= popup.duration) {
-    state.warningPopup = null;
-    return;
-  }
-  const alpha = Math.min(1, (popup.duration - elapsed) / 400);
-
-  ctx.save();
-  ctx.globalAlpha = Math.max(0, alpha);
-  ctx.font = 'bold 20px Segoe UI, Arial, sans-serif';
-  const lines = popup.text.split('\n');
-  const lineH = 26;
-  const boxW = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 40;
-  const boxH = lines.length * lineH + 20;
-  const boxX = CANVAS_W / 2 - boxW / 2;
-  const boxY = CANVAS_H / 2 - boxH / 2;
-
-  ctx.fillStyle = 'rgba(120, 20, 20, 0.92)';
-  roundRect(ctx, boxX, boxY, boxW, boxH, 10);
-  ctx.fill();
-  ctx.strokeStyle = '#ffd166';
-  ctx.lineWidth = 2;
-  roundRect(ctx, boxX, boxY, boxW, boxH, 10);
-  ctx.stroke();
-
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#ffffff';
-  lines.forEach((line, i) => {
-    ctx.fillText(line, CANVAS_W / 2, boxY + 28 + i * lineH);
-  });
   ctx.textAlign = 'left';
   ctx.restore();
 }
@@ -1471,26 +998,6 @@ function drawSponge() {
   ctx.restore();
 }
 
-// Tiny always-on-top cursor marker. The full sponge graphic renders behind
-// the Upgrades panel (so it never covers the buttons/timer), but with the
-// canvas cursor hidden (cursor: none) that left the player with literally
-// no visible pointer while positioned over the panel - making it hard to
-// hold still on a small button's hit-region for the 2s hover-buy. This dot
-// draws last, over absolutely everything, so the exact mouse position is
-// always visible no matter what else is on screen.
-function drawCursorDot() {
-  const { mouseX: x, mouseY: y } = state;
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(x, y, 4, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(255,255,255,0.95)';
-  ctx.fill();
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = 'rgba(0,0,0,0.65)';
-  ctx.stroke();
-  ctx.restore();
-}
-
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -1508,7 +1015,6 @@ function tick() {
   ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
   drawBackground();
   drawStackPile();
-  updateUpgradeHover();
 
   const plate = state.activePlate;
   if (plate && !state.animatingPlate) {
@@ -1529,14 +1035,7 @@ function tick() {
   updateBubbles();
   drawBubbles();
   drawHUD();
-  drawStackBonusPopup();
   drawSponge();
-  // Drawn after the sponge so the panel (and the hover/buy buttons on it)
-  // stays visible on top - otherwise the sponge cursor covers the button
-  // you're trying to look at while hovering it.
-  drawUpgradesPanel();
-  drawWarningPopup();
-  drawCursorDot();
 
   requestAnimationFrame(tick);
 }
@@ -1570,15 +1069,6 @@ function tick() {
 // Nothing below this comment exists yet - build it together, round by round.
 // ============================================================================
 
-// The game does not auto-start: it sits on the splash screen until the
-// player clicks "Start Washing". The render loop itself runs from the very
-// first frame (so the splash screen's animated logo etc. keep going), but
-// startRound() - and therefore any actual gameplay - only fires once.
-startWashingBtn.addEventListener('click', () => {
-  if (state.gameStarted) return;
-  state.gameStarted = true;
-  splashScreen.classList.add('hidden');
-  startRound(1);
-});
-
+renderUpgradePanel();
+startRound(1);
 requestAnimationFrame(tick);
