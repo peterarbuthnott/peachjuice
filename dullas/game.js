@@ -46,6 +46,7 @@ const nextRoundBtn = document.getElementById('next-round-btn');
 
 const splashScreen = document.getElementById('splash-screen');
 const startWashingBtn = document.getElementById('start-washing-btn');
+const continueBtn = document.getElementById('continue-btn');
 const gameOverScreen = document.getElementById('game-over-screen');
 const gameOverReasonEl = document.getElementById('game-over-reason');
 const gameOverStatsEl = document.getElementById('game-over-stats');
@@ -510,6 +511,114 @@ function platesForRound(round) {
   return baselinePlatesForRound(round) * Math.pow(2, doubleLevel);
 }
 
+// ============================================================================
+// PERSISTENCE: local save/resume + tuning telemetry
+//
+// Everything here is device-local (localStorage) - there's no backend yet.
+// A stable anonymous playerId is generated once and reused across sessions.
+// Every completed round and upgrade purchase is appended to a capped event
+// log for later analysis of how the game is actually played (are people
+// buying upgrades the moment they can afford them? where does the speed
+// bonus stop landing?). A lightweight snapshot of currency/upgrades/stacks/
+// round is saved at the same checkpoints so a player can resume a
+// part-completed game later - but only at the START of the round they were
+// on, since the actively-scrubbing plate's dirt/touch canvases can't be
+// cheaply serialized; see applySnapshotToState().
+// ============================================================================
+const STORAGE_KEYS = {
+  playerId: 'dullasDishwater.playerId',
+  save: 'dullasDishwater.save.v1',
+  events: 'dullasDishwater.events.v1',
+};
+const MAX_STORED_EVENTS = 2000; // oldest events are dropped once this cap is hit
+
+function createId() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return `id-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`;
+}
+
+function getOrCreatePlayerId() {
+  let id = null;
+  try { id = localStorage.getItem(STORAGE_KEYS.playerId); } catch (e) { /* storage unavailable */ }
+  if (!id) {
+    id = createId();
+    try { localStorage.setItem(STORAGE_KEYS.playerId, id); } catch (e) { /* best effort only */ }
+  }
+  return id;
+}
+
+// Appends one telemetry event (run start/resume/end, round-complete, or
+// upgrade purchase) to a capped local log - the raw material for tuning the
+// game later. Best-effort: if localStorage is unavailable or full, events
+// are silently dropped rather than crashing the game.
+function logEvent(event) {
+  let events = [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.events);
+    events = raw ? JSON.parse(raw) : [];
+  } catch (e) { events = []; }
+  events.push(event);
+  if (events.length > MAX_STORED_EVENTS) events.splice(0, events.length - MAX_STORED_EVENTS);
+  try { localStorage.setItem(STORAGE_KEYS.events, JSON.stringify(events)); } catch (e) { /* best effort */ }
+}
+
+// Saved at every round-complete and every purchase - just enough to
+// reconstruct currency/upgrades/stacks and restart the round the player
+// was on. Versioned so a future schema change can detect and ignore old saves.
+function saveSnapshot() {
+  const snapshot = {
+    version: 1,
+    playerId: state.playerId,
+    runId: state.runId,
+    round: state.round,
+    platesCleaned: state.platesCleaned,
+    totalPlatesWashed: state.totalPlatesWashed,
+    goldenPlatesWashed: state.goldenPlatesWashed,
+    totalPlatesSpent: state.totalPlatesSpent,
+    upgrades: { ...state.upgrades },
+    spongeRadius: state.spongeRadius,
+    scrubEfficiency: state.scrubEfficiency,
+    rewardMultiplier: state.rewardMultiplier,
+    stacks: state.stacks.map((s) => [...s]),
+    savedAt: Date.now(),
+  };
+  try { localStorage.setItem(STORAGE_KEYS.save, JSON.stringify(snapshot)); } catch (e) { /* best effort */ }
+}
+
+function loadSnapshot() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.save);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    return data && data.version === 1 ? data : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function clearSnapshot() {
+  try { localStorage.removeItem(STORAGE_KEYS.save); } catch (e) { /* best effort */ }
+}
+
+// Copies a saved snapshot into live state. Deliberately does NOT try to
+// restore progress on the plate that was mid-scrub when the snapshot was
+// taken - startRound() is called right after this (see the Continue button
+// handler) to give a fresh dirty plate/pile for whichever round the player
+// resumes into.
+function applySnapshotToState(snapshot) {
+  state.runId = snapshot.runId || state.runId;
+  state.round = snapshot.round;
+  state.platesCleaned = snapshot.platesCleaned;
+  state.totalPlatesWashed = snapshot.totalPlatesWashed;
+  state.goldenPlatesWashed = snapshot.goldenPlatesWashed;
+  state.totalPlatesSpent = snapshot.totalPlatesSpent;
+  state.upgrades = { ...snapshot.upgrades };
+  state.spongeRadius = snapshot.spongeRadius;
+  state.scrubEfficiency = snapshot.scrubEfficiency;
+  state.rewardMultiplier = snapshot.rewardMultiplier;
+  state.stacks = snapshot.stacks && snapshot.stacks.length ? snapshot.stacks.map((s) => [...s]) : [[]];
+}
+
 // ----------------------------------------------------------------------------
 // Game state
 // ----------------------------------------------------------------------------
@@ -546,6 +655,11 @@ const state = {
   stackBonusPopup: null, // { text, startTime, duration } fading bubble shown when a stack fills, see ensureStackSpace()
 
   upgradePressFlash: null, // { id, startTime, duration } brief "pressed" flash right after a buy-button click
+
+  playerId: getOrCreatePlayerId(), // stable anonymous ID, persisted in localStorage - see PERSISTENCE section above
+  runId: null, // set when a run starts/resumes, see the Start Washing / Continue handlers near the bottom of the file
+  upgradeUnlockedAt: {}, // upgrade id -> performance.now() when it first unlocked, see updateUpgradeAvailabilityTracking()
+  upgradeAffordableAt: {}, // upgrade id -> performance.now() when currency first covered its CURRENT cost
 };
 
 // ----------------------------------------------------------------------------
@@ -645,10 +759,35 @@ function buyUpgrade(def, index) {
   if (def.isMaxed && def.isMaxed()) return false;
   const cost = upgradeCost(def);
   if (state.platesCleaned < cost) return false;
+
+  const now = performance.now();
+  const unlockedAt = state.upgradeUnlockedAt[def.id];
+  const affordableAt = state.upgradeAffordableAt[def.id];
+
   state.platesCleaned -= cost;
   state.totalPlatesSpent += cost;
   state.upgrades[def.id] = (state.upgrades[def.id] || 0) + 1;
   def.apply();
+
+  logEvent({
+    type: 'upgrade_purchase',
+    playerId: state.playerId,
+    runId: state.runId,
+    upgradeId: def.id,
+    level: state.upgrades[def.id],
+    round: state.round,
+    timestamp: Date.now(),
+    cost,
+    // How long the upgrade sat unlocked/affordable before this purchase -
+    // null if that moment wasn't captured (e.g. it was already unlocked
+    // when a resumed run started).
+    msSinceUnlocked: unlockedAt != null ? Math.round(now - unlockedAt) : null,
+    msSinceAffordable: affordableAt != null ? Math.round(now - affordableAt) : null,
+  });
+  // Recomputed fresh next frame against the NEXT level's (higher) cost.
+  state.upgradeAffordableAt[def.id] = null;
+  saveSnapshot();
+
   return true;
 }
 
@@ -668,6 +807,26 @@ function isUpgradeUnlocked(index) {
 // this, so this only fires once the whole capped upgrade tree is exhausted.
 function allUpgradesMaxed() {
   return UPGRADE_DEFS.every((def) => def.isMaxed && def.isMaxed());
+}
+
+// Records, once each, the moment an upgrade first unlocks and the moment it
+// first becomes affordable at its CURRENT cost - purely for the purchase
+// telemetry logged in buyUpgrade() (how long does a player sit on an
+// available upgrade before buying it?). Called once per frame from tick().
+function updateUpgradeAvailabilityTracking() {
+  UPGRADE_DEFS.forEach((def, index) => {
+    if (isUpgradeUnlocked(index) && state.upgradeUnlockedAt[def.id] == null) {
+      state.upgradeUnlockedAt[def.id] = performance.now();
+    }
+    if (
+      state.upgradeUnlockedAt[def.id] != null &&
+      state.upgradeAffordableAt[def.id] == null &&
+      !(def.isMaxed && def.isMaxed()) &&
+      state.platesCleaned >= upgradeCost(def)
+    ) {
+      state.upgradeAffordableAt[def.id] = performance.now();
+    }
+  });
 }
 
 // Random peek-out offset for each dirty plate waiting under the active one.
@@ -724,6 +883,27 @@ function onRoundComplete() {
   state.roundFinalElapsedMs = elapsed;
   state.roundFinalBonusEarned = bonusEarned;
 
+  // Tuning telemetry + resume checkpoint - logged for every round,
+  // including the final one, before the win-condition check below.
+  logEvent({
+    type: 'round_complete',
+    playerId: state.playerId,
+    runId: state.runId,
+    round: state.round,
+    timestamp: Date.now(),
+    platesCleanedThisRound: state.roundPlatesWashed,
+    currencyEarnedThisRound: state.roundCurrencyEarned,
+    elapsedMs: Math.round(elapsed),
+    timeLimitMs: Math.round(timeLimitMs),
+    bonusEarned,
+    bonusAmount,
+    platesCleanedLifetime: state.totalPlatesWashed,
+    goldenPlatesLifetime: state.goldenPlatesWashed,
+    currency: state.platesCleaned,
+    upgrades: { ...state.upgrades },
+  });
+  saveSnapshot();
+
   // Two win conditions, whichever comes first: finishing MAX_ROUNDS, or
   // maxing out every capped upgrade. Show the game-over/stats screen
   // instead of the usual round-complete panel when either is met.
@@ -753,6 +933,21 @@ function showGameOverScreen(reason) {
   state.activePlate = null;
   state.animatingPlate = null;
   roundCompletePanel.classList.add('hidden');
+
+  logEvent({
+    type: 'run_end',
+    playerId: state.playerId,
+    runId: state.runId,
+    timestamp: Date.now(),
+    reason,
+    round: state.round,
+    totalPlatesWashed: state.totalPlatesWashed,
+    goldenPlatesWashed: state.goldenPlatesWashed,
+    totalPlatesSpent: state.totalPlatesSpent,
+  });
+  // The run is finished, so there's no partial progress worth resuming -
+  // the next launch starts a brand new run.
+  clearSnapshot();
 
   // Only list upgrades actually bought at least once, in the same order
   // they appear in the upgrade panel.
@@ -881,14 +1076,13 @@ canvas.addEventListener('touchmove', (e) => {
 }, { passive: false });
 window.addEventListener('touchend', () => { state.isScrubbing = false; });
 
-// Upgrade "Buy" buttons are plain click targets, like any other button -
+// Upgrade "Buy" buttons are plain click/tap targets, like any other button -
 // scrubbing stays hover-only (mousemove/touchmove above), but purchasing an
-// upgrade needs an actual click inside its button's hit-region (see
+// upgrade needs an actual click/tap inside its button's hit-region (see
 // upgradeButtonRect()). buyUpgrade() already no-ops safely if the upgrade
 // is locked, maxed, or unaffordable, so there's nothing extra to gate here.
-canvas.addEventListener('click', (e) => {
+function tryBuyUpgradeAt(x, y) {
   if (!state.gameStarted || state.gameOver) return;
-  const { x, y } = getCanvasCoords(e.clientX, e.clientY);
   for (let i = 0; i < UPGRADE_DEFS.length; i++) {
     const btn = upgradeButtonRect(i);
     if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
@@ -899,7 +1093,25 @@ canvas.addEventListener('click', (e) => {
       break;
     }
   }
+}
+
+canvas.addEventListener('click', (e) => {
+  const { x, y } = getCanvasCoords(e.clientX, e.clientY);
+  tryBuyUpgradeAt(x, y);
 });
+
+// Mobile needs its own tap handler: touchstart/touchmove above call
+// preventDefault() (to stop the page scrolling while scrubbing), and doing
+// so also suppresses the browser's synthetic "click" event it would
+// otherwise fire after a tap - so the click listener above never runs on
+// a touchscreen. Handling the tap directly on touchend fixes that.
+canvas.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  const t = e.changedTouches[0];
+  if (!t) return;
+  const { x, y } = getCanvasCoords(t.clientX, t.clientY);
+  tryBuyUpgradeAt(x, y);
+}, { passive: false });
 
 // ----------------------------------------------------------------------------
 // Suds particles (purely cosmetic feedback while scrubbing)
@@ -1311,6 +1523,7 @@ function tick() {
   ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
   drawBackground();
   drawStackPile();
+  updateUpgradeAvailabilityTracking();
 
   const plate = state.activePlate;
   if (plate && !state.animatingPlate) {
@@ -1373,14 +1586,60 @@ function tick() {
 // ============================================================================
 
 // The game does not auto-start: it sits on the splash screen until the
-// player clicks "Start Washing". The render loop itself runs from the very
-// first frame (so the splash screen's animated logo etc. keep going), but
-// startRound() - and therefore any actual gameplay - only fires once.
+// player clicks "Start Washing" (or "Continue", if a saved game exists).
+// The render loop itself runs from the very first frame (so the splash
+// screen's animated logo etc. keep going), but startRound() - and
+// therefore any actual gameplay - only fires once.
 startWashingBtn.addEventListener('click', () => {
   if (state.gameStarted) return;
+  // Starting fresh abandons any part-completed run rather than silently
+  // leaving it orphaned in storage - logged so it's distinguishable from a
+  // normal completed/finished run in the telemetry.
+  const existing = loadSnapshot();
+  if (existing) {
+    logEvent({
+      type: 'run_end',
+      playerId: state.playerId,
+      runId: existing.runId,
+      timestamp: Date.now(),
+      reason: 'abandoned_new_game',
+      round: existing.round,
+    });
+    clearSnapshot();
+  }
+  state.runId = createId();
+  logEvent({ type: 'run_start', playerId: state.playerId, runId: state.runId, timestamp: Date.now() });
   state.gameStarted = true;
   splashScreen.classList.add('hidden');
   startRound(1);
+  saveSnapshot();
 });
+
+continueBtn.addEventListener('click', () => {
+  if (state.gameStarted) return;
+  const snapshot = loadSnapshot();
+  if (!snapshot) return;
+  applySnapshotToState(snapshot);
+  logEvent({
+    type: 'run_resumed',
+    playerId: state.playerId,
+    runId: state.runId,
+    timestamp: Date.now(),
+    round: state.round,
+  });
+  state.gameStarted = true;
+  splashScreen.classList.add('hidden');
+  // Restarts the round the player was on with a fresh dirty plate/pile -
+  // see applySnapshotToState()'s comment for why mid-plate progress can't
+  // be restored, and startRound() for why this leaves state.stacks alone.
+  startRound(state.round);
+});
+
+// Offer "Continue" only if a resumable save actually exists.
+const savedGame = loadSnapshot();
+if (savedGame) {
+  continueBtn.textContent = `Continue - Round ${savedGame.round}`;
+  continueBtn.classList.remove('hidden');
+}
 
 requestAnimationFrame(tick);
