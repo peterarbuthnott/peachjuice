@@ -75,39 +75,24 @@ html, body {
   color: #9fd8b8;
 }
 
-/* Hover-hold button: no click needed, matching the canvas upgrade buttons -
-   hovering for a couple of seconds shows a spinning yellow->red pie timer
-   (see #next-round-timer) and then "presses" itself automatically. See the
-   mouseenter/mouseleave handlers in game.js. */
 #next-round-btn {
-  position: relative;
   background: #4caf7d;
   color: #fff;
   border: none;
-  padding: 12px 40px 12px 28px;
+  padding: 12px 28px;
   font-size: 16px;
   font-weight: 600;
   border-radius: 8px;
-  cursor: default;
-  transition: background 0.15s ease, transform 0.1s ease, filter 0.1s ease;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
 }
 
-#next-round-btn.pressed {
-  filter: brightness(0.8);
-  transform: scale(0.96);
+#next-round-btn:hover {
+  background: #5ac48f;
 }
 
-#next-round-timer {
-  position: absolute;
-  top: 50%;
-  right: 14px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  transform: translateY(-50%);
-  background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  pointer-events: none;
+#next-round-btn:active {
+  transform: scale(0.97);
 }
 
 /* The Upgrades panel now renders directly on the canvas (see

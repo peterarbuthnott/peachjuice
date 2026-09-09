@@ -43,7 +43,6 @@ const roundCompleteCleaned = document.getElementById('round-complete-cleaned');
 const roundCompleteEarned = document.getElementById('round-complete-earned');
 const roundCompleteBonus = document.getElementById('round-complete-bonus');
 const nextRoundBtn = document.getElementById('next-round-btn');
-const nextRoundTimerEl = document.getElementById('next-round-timer');
 
 const splashScreen = document.getElementById('splash-screen');
 const startWashingBtn = document.getElementById('start-washing-btn');
@@ -136,13 +135,10 @@ function ensureStackSpace() {
 // Upgrades panel: drawn directly on the canvas as a box on the LEFT of the
 // play area, mirroring the Stacks container's position/size on the right
 // (same width/height/y, reflected across the canvas). No DOM buttons - each
-// upgrade has a "buy button" hit-region; hovering it (no clicking needed,
-// consistent with the rest of the game) for UPGRADE_HOVER_HOLD_MS shows a
-// small pie timer spinning yellow->red, then auto-triggers the purchase
-// and restarts if the player keeps hovering. See updateUpgradeHover() and
-// drawUpgradesPanel() further down.
+// upgrade has a "buy button" hit-region that responds to a normal click,
+// exactly like the old DOM buttons did. See the canvas 'click' listener
+// further down and drawUpgradesPanel().
 // ----------------------------------------------------------------------------
-const UPGRADE_HOVER_HOLD_MS = 2000;
 const UPGRADE_CONTAINER = { w: STACK_CONTAINER.w, h: STACK_CONTAINER.h, y: STACK_CONTAINER.y };
 UPGRADE_CONTAINER.x = CANVAS_W - (STACK_CONTAINER.x + STACK_CONTAINER.w); // mirror of STACK_CONTAINER.x
 
@@ -164,8 +160,8 @@ function upgradeItemRect(index) {
     h: itemH,
   };
 }
-// The clickable (well, hoverable) "Buy" region within an upgrade card - the
-// bottom third of the card.
+// The clickable "Buy" region within an upgrade card - the bottom third of
+// the card.
 function upgradeButtonRect(index) {
   const item = upgradeItemRect(index);
   const btnH = 22;
@@ -185,19 +181,6 @@ function fittedFontSize(text, maxWidth, maxSize, minSize, bold = false) {
     size -= 1;
   }
   return size;
-}
-
-// Simple RGB lerp between two "#rrggbb" colours - used for the hover
-// timer's yellow -> red fill.
-function lerpColor(hexA, hexB, t) {
-  const a = parseInt(hexA.slice(1), 16);
-  const b = parseInt(hexB.slice(1), 16);
-  const ar = (a >> 16) & 0xff, ag = (a >> 8) & 0xff, ab = a & 0xff;
-  const br = (b >> 16) & 0xff, bg = (b >> 8) & 0xff, bb = b & 0xff;
-  const r = Math.round(ar + (br - ar) * t);
-  const g = Math.round(ag + (bg - ag) * t);
-  const bl = Math.round(ab + (bb - ab) * t);
-  return `rgb(${r},${g},${bl})`;
 }
 
 const CLEAN_THRESHOLD = 0.95; // average grime remaining must drop below this
@@ -560,12 +543,9 @@ const state = {
   roundFinalElapsedMs: null, // elapsed time frozen at the moment the round ended, for the timer pie chart
   roundFinalBonusEarned: false, // whether the speed bonus was earned, frozen alongside roundFinalElapsedMs
   washTimestamps: [], // performance.now() of every plate wash, trimmed to the last 60s - see getPlatesPerMinute()
-  clickCount: 0, // mousedown-on-canvas count for the anti-click penalty mechanic
   stackBonusPopup: null, // { text, startTime, duration } fading bubble shown when a stack fills, see ensureStackSpace()
-  warningPopup: null, // { text, startTime, duration } fading "don't click" banner, see the mousedown handler
 
-  upgradeHover: null, // { id, index, startTime } - which buy button is currently being hovered, see updateUpgradeHover()
-  upgradePressFlash: null, // { id, startTime, duration } brief "pressed" flash once a hover-buy triggers
+  upgradePressFlash: null, // { id, startTime, duration } brief "pressed" flash right after a buy-button click
 };
 
 // ----------------------------------------------------------------------------
@@ -690,52 +670,6 @@ function allUpgradesMaxed() {
   return UPGRADE_DEFS.every((def) => def.isMaxed && def.isMaxed());
 }
 
-// Which (if any) upgrade's buy button the mouse currently sits over - only
-// unlocked, non-maxed, affordable buttons are hoverable/purchasable at all,
-// matching what would previously have been an enabled DOM button.
-function getHoveredBuyableUpgradeIndex() {
-  for (let i = 0; i < UPGRADE_DEFS.length; i++) {
-    const def = UPGRADE_DEFS[i];
-    if (!isUpgradeUnlocked(i)) continue;
-    if (def.isMaxed && def.isMaxed()) continue;
-    if (state.platesCleaned < upgradeCost(def)) continue;
-    const btn = upgradeButtonRect(i);
-    if (
-      state.mouseX >= btn.x && state.mouseX <= btn.x + btn.w &&
-      state.mouseY >= btn.y && state.mouseY <= btn.y + btn.h
-    ) {
-      return i;
-    }
-  }
-  return -1;
-}
-
-// No clicking needed here either: hovering a buy button for
-// UPGRADE_HOVER_HOLD_MS "depresses" it exactly as a click would, then keeps
-// going (repeat-buying) for as long as the player keeps hovering.
-function updateUpgradeHover() {
-  if (!state.gameStarted || state.gameOver) {
-    state.upgradeHover = null;
-    return;
-  }
-  const hoveredIndex = getHoveredBuyableUpgradeIndex();
-  if (hoveredIndex === -1) {
-    state.upgradeHover = null;
-    return;
-  }
-  const def = UPGRADE_DEFS[hoveredIndex];
-  if (!state.upgradeHover || state.upgradeHover.id !== def.id) {
-    state.upgradeHover = { id: def.id, index: hoveredIndex, startTime: performance.now() };
-    return;
-  }
-  const elapsed = performance.now() - state.upgradeHover.startTime;
-  if (elapsed >= UPGRADE_HOVER_HOLD_MS) {
-    buyUpgrade(def, hoveredIndex);
-    state.upgradePressFlash = { id: def.id, startTime: performance.now(), duration: 180 };
-    state.upgradeHover.startTime = performance.now(); // restart - holding keeps buying
-  }
-}
-
 // Random peek-out offset for each dirty plate waiting under the active one.
 // All of them are rendered (see drawStackPile()), but the distance is scaled
 // so even the very last (farthest) one never exceeds STACK_MAX_OFFSET -
@@ -811,9 +745,8 @@ function onRoundComplete() {
 }
 
 // Shows the shared end screen (same dynamic logo + copyright as the splash
-// screen) with a short reason and a handful of lifetime stats. Reused both
-// for a normal win (round 35 / all upgrades maxed) and for the anti-click
-// forced exit.
+// screen) with a short reason and a handful of lifetime stats - shown when
+// the player finishes round MAX_ROUNDS or maxes out every upgrade.
 function showGameOverScreen(reason) {
   state.gameOver = true;
   state.roundComplete = true;
@@ -841,45 +774,9 @@ function showGameOverScreen(reason) {
   gameOverScreen.classList.remove('hidden');
 }
 
-// Hover-hold, same as the canvas upgrade buttons: no click needed. This
-// button lives in the HTML round-complete panel rather than the canvas, so
-// the spinning timer is a small DOM overlay (conic-gradient) instead of a
-// canvas-drawn pie, but it reuses the same hold duration and colour lerp.
-let nextRoundHoverStart = null;
-let nextRoundHoverRAF = null;
-
-function cancelNextRoundHover() {
-  nextRoundHoverStart = null;
-  if (nextRoundHoverRAF != null) {
-    cancelAnimationFrame(nextRoundHoverRAF);
-    nextRoundHoverRAF = null;
-  }
-  nextRoundTimerEl.style.background = 'rgba(0, 0, 0, 0.35)';
-}
-
-function updateNextRoundHoverVisual() {
-  if (nextRoundHoverStart == null) return;
-  const elapsed = performance.now() - nextRoundHoverStart;
-  const frac = Math.min(1, elapsed / UPGRADE_HOVER_HOLD_MS);
-  const col = lerpColor(UPGRADE_TIMER_YELLOW, UPGRADE_TIMER_RED, frac);
-  nextRoundTimerEl.style.background =
-    `conic-gradient(${col} ${frac * 360}deg, rgba(0,0,0,0.35) ${frac * 360}deg)`;
-
-  if (frac >= 1) {
-    cancelNextRoundHover();
-    nextRoundBtn.classList.add('pressed');
-    setTimeout(() => nextRoundBtn.classList.remove('pressed'), 180);
-    startRound(state.round + 1);
-    return;
-  }
-  nextRoundHoverRAF = requestAnimationFrame(updateNextRoundHoverVisual);
-}
-
-nextRoundBtn.addEventListener('mouseenter', () => {
-  nextRoundHoverStart = performance.now();
-  nextRoundHoverRAF = requestAnimationFrame(updateNextRoundHoverVisual);
+nextRoundBtn.addEventListener('click', () => {
+  startRound(state.round + 1);
 });
-nextRoundBtn.addEventListener('mouseleave', cancelNextRoundHover);
 
 // Kicks off the fly-to-stack animation for a just-cleaned plate. The plate
 // object is reused (repositioned each frame) purely for drawing; once the
@@ -984,25 +881,24 @@ canvas.addEventListener('touchmove', (e) => {
 }, { passive: false });
 window.addEventListener('touchend', () => { state.isScrubbing = false; });
 
-// Anti-click penalty: the game is a hover-only, no-click interaction - the
-// canvas has no mousedown-driven behaviour of its own, so any mousedown here
-// can only be the player pressing a button out of habit. Legitimate UI
-// (upgrade "Buy" buttons, "Next Round") lives in separate DOM elements
-// outside the canvas and is unaffected. Escalates after repeated clicks and
-// forces a game-over on the 6th.
-canvas.addEventListener('mousedown', () => {
+// Upgrade "Buy" buttons are plain click targets, like any other button -
+// scrubbing stays hover-only (mousemove/touchmove above), but purchasing an
+// upgrade needs an actual click inside its button's hit-region (see
+// upgradeButtonRect()). buyUpgrade() already no-ops safely if the upgrade
+// is locked, maxed, or unaffordable, so there's nothing extra to gate here.
+canvas.addEventListener('click', (e) => {
   if (!state.gameStarted || state.gameOver) return;
-  state.clickCount += 1;
-
-  if (state.clickCount >= 6) {
-    showGameOverScreen('You were exited from the game for repeatedly clicking!');
-    return;
+  const { x, y } = getCanvasCoords(e.clientX, e.clientY);
+  for (let i = 0; i < UPGRADE_DEFS.length; i++) {
+    const btn = upgradeButtonRect(i);
+    if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
+      const def = UPGRADE_DEFS[i];
+      if (buyUpgrade(def, i)) {
+        state.upgradePressFlash = { id: def.id, startTime: performance.now(), duration: 150 };
+      }
+      break;
+    }
   }
-
-  const text = state.clickCount >= 5
-    ? "Don't Press The Buttons - save the mouse.\nYou will be exited from the game if you continue!"
-    : "Don't Press The Buttons - save the mouse.";
-  state.warningPopup = { text, startTime: performance.now(), duration: 2200 };
 });
 
 // ----------------------------------------------------------------------------
@@ -1143,7 +1039,8 @@ function drawStacks() {
 
 // Upgrades box on the left, mirroring drawStacks()'s container on the
 // right. Each card shows name / level / current value plus a "Buy" button;
-// buttons are hovered (not clicked) to purchase - see drawUpgradeButton().
+// buttons are clicked (see the canvas 'click' listener above) to purchase -
+// see drawUpgradeButton().
 function drawUpgradesPanel() {
   ctx.save();
   ctx.fillStyle = 'rgba(0,0,0,0.2)';
@@ -1215,11 +1112,9 @@ function drawUpgradesPanel() {
   });
 }
 
-// Draws one upgrade's buy button, plus (if it's the one currently being
-// hovered) the spinning yellow->red hold timer, and a brief darkened
-// "pressed" flash right after it fires.
-const UPGRADE_TIMER_YELLOW = '#ffd166';
-const UPGRADE_TIMER_RED = '#e05252';
+// Draws one upgrade's buy button, including a brief darkened "pressed"
+// flash right after a click on it fires a purchase (see the canvas
+// 'click' listener above).
 function drawUpgradeButton(def, index, rect, label, kind) {
   const pressed = state.upgradePressFlash
     && state.upgradePressFlash.id === def.id
@@ -1230,50 +1125,18 @@ function drawUpgradeButton(def, index, rect, label, kind) {
   if (kind === 'buy') { bg = pressed ? '#3d8f66' : '#4caf7d'; fg = '#ffffff'; }
   else if (kind === 'unaffordable') { bg = '#3a4a46'; fg = '#8fa39c'; }
 
-  // Buyable buttons show the hover timer circle at their right edge, so
-  // reserve room for it and shift the (center-aligned) label left to match.
-  const reserveRight = (kind === 'buy' || kind === 'unaffordable') ? 20 : 0;
-  const centerX = rect.x + (rect.w - reserveRight) / 2;
-
   ctx.save();
   ctx.fillStyle = bg;
   roundRect(ctx, rect.x, rect.y, rect.w, rect.h, 5);
   ctx.fill();
-  fittedFontSize(label, rect.w - 10 - reserveRight, 11, 7, true);
+  fittedFontSize(label, rect.w - 10, 11, 7, true);
   ctx.fillStyle = fg;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(label, centerX, rect.y + rect.h / 2 + 1);
+  ctx.fillText(label, rect.x + rect.w / 2, rect.y + rect.h / 2 + 1);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
   ctx.restore();
-
-  if (kind === 'buy' && state.upgradeHover && state.upgradeHover.index === index) {
-    const elapsed = performance.now() - state.upgradeHover.startTime;
-    const frac = Math.min(1, elapsed / UPGRADE_HOVER_HOLD_MS);
-    const cx = rect.x + rect.w - 12, cy = rect.y + rect.h / 2, r = 8;
-    const col = lerpColor(UPGRADE_TIMER_YELLOW, UPGRADE_TIMER_RED, frac);
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.fill();
-    if (frac > 0) {
-      ctx.beginPath();
-      ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
-      ctx.closePath();
-      ctx.fillStyle = col;
-      ctx.fill();
-    }
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.restore();
-  }
 }
 
 // Small pie-chart clock showing elapsed round time as a fraction of the
@@ -1392,46 +1255,6 @@ function drawStackBonusPopup() {
   ctx.restore();
 }
 
-// Fading "Don't Press The Buttons" warning banner, shown when the player
-// clicks the canvas - see the mousedown listener below for the escalation
-// rules (extra line after 4 clicks, forced game-over on the 6th).
-function drawWarningPopup() {
-  const popup = state.warningPopup;
-  if (!popup) return;
-  const elapsed = performance.now() - popup.startTime;
-  if (elapsed >= popup.duration) {
-    state.warningPopup = null;
-    return;
-  }
-  const alpha = Math.min(1, (popup.duration - elapsed) / 400);
-
-  ctx.save();
-  ctx.globalAlpha = Math.max(0, alpha);
-  ctx.font = 'bold 20px Segoe UI, Arial, sans-serif';
-  const lines = popup.text.split('\n');
-  const lineH = 26;
-  const boxW = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 40;
-  const boxH = lines.length * lineH + 20;
-  const boxX = CANVAS_W / 2 - boxW / 2;
-  const boxY = CANVAS_H / 2 - boxH / 2;
-
-  ctx.fillStyle = 'rgba(120, 20, 20, 0.92)';
-  roundRect(ctx, boxX, boxY, boxW, boxH, 10);
-  ctx.fill();
-  ctx.strokeStyle = '#ffd166';
-  ctx.lineWidth = 2;
-  roundRect(ctx, boxX, boxY, boxW, boxH, 10);
-  ctx.stroke();
-
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#ffffff';
-  lines.forEach((line, i) => {
-    ctx.fillText(line, CANVAS_W / 2, boxY + 28 + i * lineH);
-  });
-  ctx.textAlign = 'left';
-  ctx.restore();
-}
-
 function drawSponge() {
   const { mouseX: x, mouseY: y } = state;
   ctx.save();
@@ -1471,26 +1294,6 @@ function drawSponge() {
   ctx.restore();
 }
 
-// Tiny always-on-top cursor marker. The full sponge graphic renders behind
-// the Upgrades panel (so it never covers the buttons/timer), but with the
-// canvas cursor hidden (cursor: none) that left the player with literally
-// no visible pointer while positioned over the panel - making it hard to
-// hold still on a small button's hit-region for the 2s hover-buy. This dot
-// draws last, over absolutely everything, so the exact mouse position is
-// always visible no matter what else is on screen.
-function drawCursorDot() {
-  const { mouseX: x, mouseY: y } = state;
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(x, y, 4, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(255,255,255,0.95)';
-  ctx.fill();
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = 'rgba(0,0,0,0.65)';
-  ctx.stroke();
-  ctx.restore();
-}
-
 function roundRect(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -1508,7 +1311,6 @@ function tick() {
   ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
   drawBackground();
   drawStackPile();
-  updateUpgradeHover();
 
   const plate = state.activePlate;
   if (plate && !state.animatingPlate) {
@@ -1526,17 +1328,17 @@ function tick() {
   }
 
   drawStacks();
+  drawUpgradesPanel();
   updateBubbles();
   drawBubbles();
   drawHUD();
   drawStackBonusPopup();
+  // Drawn last so the sponge is always the topmost thing on screen,
+  // consistently over the whole Upgrades panel (box, text, and buttons
+  // alike) rather than the previous mixed look where the panel's opaque
+  // text/buttons covered the sponge but its translucent box background
+  // let it show through underneath.
   drawSponge();
-  // Drawn after the sponge so the panel (and the hover/buy buttons on it)
-  // stays visible on top - otherwise the sponge cursor covers the button
-  // you're trying to look at while hovering it.
-  drawUpgradesPanel();
-  drawWarningPopup();
-  drawCursorDot();
 
   requestAnimationFrame(tick);
 }
