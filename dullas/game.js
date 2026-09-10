@@ -56,13 +56,13 @@ const gameOverStatsEl = document.getElementById('game-over-stats');
 // API - no sound files to ship or license, and every cue is just a couple
 // of short oscillator/noise bursts shaped with a volume envelope. Browsers
 // won't let an AudioContext actually produce sound until a real user
-// gesture has happened, but *constructing* one doesn't need a gesture - so
-// ensureAudioContext() is called unconditionally at load time (below) to
-// get that construction cost out of the way early, and again on the very
-// first pointerdown/keydown anywhere on the page to start resume() as soon
-// as possible - both well before the player actually presses Start Washing,
-// so that click's own playLetsGo() call finds the context already running
-// instead of paying for construction+resume from a cold start.
+// gesture has happened - and, per Chrome/Firefox's own advice, constructing
+// one *before* that gesture is what logs the "AudioContext was not allowed
+// to start" console warning (harmless, but noisy). So ensureAudioContext()
+// is never called until a real gesture: the first pointerdown/keydown
+// anywhere on the page constructs+resumes it as early as possible, well
+// before the player actually presses Start Washing, so that click's own
+// playLetsGo() call is likely to find the context already running.
 // ============================================================================
 let audioCtx = null;
 let masterGain = null;
@@ -81,9 +81,6 @@ function ensureAudioContext() {
     audioCtx = null; // Web Audio unavailable - every sound call below becomes a silent no-op
   }
 }
-
-// Build the (suspended) context immediately rather than waiting for a click.
-ensureAudioContext();
 
 // A freshly-created (or freshly-resumed) AudioContext can sit in
 // 'suspended' for a moment before its clock actually starts advancing.
@@ -482,14 +479,19 @@ class Plate {
     this._dirtSampleCanvas = document.createElement('canvas');
     this._dirtSampleCanvas.width = 32;
     this._dirtSampleCanvas.height = 32;
-    this._dirtSampleCtx = this._dirtSampleCanvas.getContext('2d');
+    // willReadFrequently: true - samplePercentClear() calls getImageData()
+    // on this context every time the clean/coverage cache goes stale
+    // (essentially every scrub), which is exactly the repeated-readback
+    // pattern this hint exists for; without it Chrome logs a console
+    // warning suggesting it once enough reads have piled up.
+    this._dirtSampleCtx = this._dirtSampleCanvas.getContext('2d', { willReadFrequently: true });
     this._cleanPercentCache = 0;
     this._dirtCacheStale = true;
 
     this._touchSampleCanvas = document.createElement('canvas');
     this._touchSampleCanvas.width = 32;
     this._touchSampleCanvas.height = 32;
-    this._touchSampleCtx = this._touchSampleCanvas.getContext('2d');
+    this._touchSampleCtx = this._touchSampleCanvas.getContext('2d', { willReadFrequently: true });
     this._coveragePercentCache = 0;
     this._touchCacheStale = true;
 
