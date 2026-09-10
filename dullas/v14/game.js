@@ -51,203 +51,6 @@ const gameOverScreen = document.getElementById('game-over-screen');
 const gameOverReasonEl = document.getElementById('game-over-reason');
 const gameOverStatsEl = document.getElementById('game-over-stats');
 
-// ============================================================================
-// AUDIO: every sound effect is synthesised on the fly with the Web Audio
-// API - no sound files to ship or license, and every cue is just a couple
-// of short oscillator/noise bursts shaped with a volume envelope. Browsers
-// won't let an AudioContext actually produce sound until a real user
-// gesture has happened, but *constructing* one doesn't need a gesture - so
-// ensureAudioContext() is called unconditionally at load time (below) to
-// get that construction cost out of the way early, and again on the very
-// first pointerdown/keydown anywhere on the page to start resume() as soon
-// as possible - both well before the player actually presses Start Washing,
-// so that click's own playLetsGo() call finds the context already running
-// instead of paying for construction+resume from a cold start.
-// ============================================================================
-let audioCtx = null;
-let masterGain = null;
-
-function ensureAudioContext() {
-  if (audioCtx) {
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    return;
-  }
-  try {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    masterGain = audioCtx.createGain();
-    masterGain.gain.value = 0.6; // overall SFX volume
-    masterGain.connect(audioCtx.destination);
-  } catch (e) {
-    audioCtx = null; // Web Audio unavailable - every sound call below becomes a silent no-op
-  }
-}
-
-// Build the (suspended) context immediately rather than waiting for a click.
-ensureAudioContext();
-
-// A freshly-created (or freshly-resumed) AudioContext can sit in
-// 'suspended' for a moment before its clock actually starts advancing.
-// Scheduling tones against audioCtx.currentTime during that gap used to
-// cause a bug: every event got queued against a clock that hadn't moved
-// yet, so the instant it finally started, everything queued during the
-// silent gap fired at once - "no noise, then a burst of everything at
-// once" a few seconds after starting/resuming a game. whenAudioRunning()
-// defers a callback until the context is confirmed actually running, and
-// playTone()/playSweep() below refuse to schedule anything otherwise, so a
-// stray call made just before that point is silently skipped rather than
-// queued up wrong.
-function whenAudioRunning(fn) {
-  if (!audioCtx) return;
-  if (audioCtx.state === 'running') {
-    fn();
-  } else {
-    audioCtx.resume().then(() => {
-      if (audioCtx && audioCtx.state === 'running') fn();
-    });
-  }
-}
-
-// Fires resume() off the very first user gesture anywhere on the page -
-// pointerdown/keydown happen slightly before the click a player uses to
-// actually press Start Washing/Continue, so this gives the browser's audio
-// thread a small head start. Once resumed, one totally silent tone is
-// scheduled to force a real render cycle through the graph - some browsers
-// (mobile Safari especially) still have a first-sound hitch otherwise, so
-// this "spends" that hitch immediately instead of on the very first
-// gameplay cue (the scrubbing "blubble").
-function primeAudioOnFirstGesture() {
-  ensureAudioContext();
-  if (audioCtx) {
-    audioCtx.resume().then(() => {
-      playTone({ freq: 440, duration: 0.01, gain: 0.0001 });
-    });
-  }
-  window.removeEventListener('pointerdown', primeAudioOnFirstGesture);
-  window.removeEventListener('keydown', primeAudioOnFirstGesture);
-}
-window.addEventListener('pointerdown', primeAudioOnFirstGesture, { once: true });
-window.addEventListener('keydown', primeAudioOnFirstGesture, { once: true });
-
-// One short oscillator burst with a quick attack and an exponential decay
-// (the shape almost every one-shot game SFX below is built from). `start`
-// delays this particular burst relative to "now", so a cue can be composed
-// of two or three overlapping/sequential playTone() calls.
-function playTone({ freq, type = 'sine', duration = 0.15, start = 0, gain = 0.15, attack = 0.004 }) {
-  if (!audioCtx || audioCtx.state !== 'running') return;
-  const t0 = audioCtx.currentTime + start;
-  const osc = audioCtx.createOscillator();
-  osc.type = type;
-  osc.frequency.setValueAtTime(freq, t0);
-  const g = audioCtx.createGain();
-  g.gain.setValueAtTime(0, t0);
-  g.gain.linearRampToValueAtTime(gain, t0 + attack);
-  g.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
-  osc.connect(g).connect(masterGain);
-  osc.start(t0);
-  osc.stop(t0 + duration + 0.02);
-}
-
-// A rising/falling pitch sweep - used for the "less-go" start cue.
-function playSweep({ freqStart, freqEnd, type = 'sawtooth', duration = 0.3, gain = 0.12 }) {
-  if (!audioCtx || audioCtx.state !== 'running') return;
-  const t0 = audioCtx.currentTime;
-  const osc = audioCtx.createOscillator();
-  osc.type = type;
-  osc.frequency.setValueAtTime(freqStart, t0);
-  osc.frequency.exponentialRampToValueAtTime(Math.max(1, freqEnd), t0 + duration);
-  const g = audioCtx.createGain();
-  g.gain.setValueAtTime(0, t0);
-  g.gain.linearRampToValueAtTime(gain, t0 + 0.02);
-  g.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
-  osc.connect(g).connect(masterGain);
-  osc.start(t0);
-  osc.stop(t0 + duration + 0.02);
-}
-
-// "clink" - a plate landing on the stack: two quick bright ceramic-ish tones.
-function playClink() {
-  playTone({ freq: 2200, type: 'triangle', duration: 0.12, gain: 0.18 });
-  playTone({ freq: 3100, type: 'sine', duration: 0.09, gain: 0.10, start: 0.015 });
-}
-
-// "ka-ching" - a stack fills up: two rising square-wave chimes, cash-register style.
-function playKaChing() {
-  playTone({ freq: 1100, type: 'square', duration: 0.14, gain: 0.12 });
-  playTone({ freq: 1650, type: 'square', duration: 0.18, gain: 0.14, start: 0.09 });
-}
-
-// "pa-ping" - upgrade bought: a short low "pa" thump followed by a bright "ping".
-function playPaPing() {
-  playTone({ freq: 160, type: 'square', duration: 0.07, gain: 0.16 });
-  playTone({ freq: 1800, type: 'sine', duration: 0.16, gain: 0.14, start: 0.06 });
-}
-
-// "less-go" - game started/resumed: an energetic upward sweep.
-function playLetsGo() {
-  playSweep({ freqStart: 260, freqEnd: 920, type: 'sawtooth', duration: 0.35, gain: 0.12 });
-}
-
-// "bling" - a golden plate appears: three shimmering high tones. `start`
-// offsets all three together, so this one shimmer can be scheduled to
-// repeat back-to-back (see playGoldenBling() below) without duplicating
-// the tone definitions.
-function playBling(start = 0) {
-  playTone({ freq: 2600, type: 'sine', duration: 0.22, gain: 0.10, start });
-  playTone({ freq: 3300, type: 'sine', duration: 0.20, gain: 0.08, start: start + 0.03 });
-  playTone({ freq: 4100, type: 'sine', duration: 0.18, gain: 0.06, start: start + 0.06 });
-}
-
-// A golden plate is a bigger deal, so its cue is the shimmer played twice
-// back-to-back rather than once - roughly double the length of a lone
-// "bling".
-function playGoldenBling() {
-  playBling(0);
-  playBling(0.28);
-}
-
-// "da-dang" - a round ends: two punchy descending square-wave notes.
-function playDaDang() {
-  playTone({ freq: 520, type: 'square', duration: 0.16, gain: 0.14 });
-  playTone({ freq: 360, type: 'square', duration: 0.22, gain: 0.16, start: 0.15 });
-}
-
-// "dang-da" - the reverse of the round-end cue, used for the Next Round
-// button: same two notes, pitch order and timing flipped (rising instead
-// of falling).
-function playDangDa() {
-  playTone({ freq: 360, type: 'square', duration: 0.16, gain: 0.14 });
-  playTone({ freq: 520, type: 'square', duration: 0.22, gain: 0.16, start: 0.15 });
-}
-
-// "blubble-blubble" - a soft double-dip bubbly blip, used while actively
-// scrubbing. Each call plays two quick, quiet, slightly-randomised sine
-// dips so repeated calls don't sound mechanically identical.
-function playBlubble() {
-  const base = 170 + Math.random() * 70;
-  playTone({ freq: base, type: 'sine', duration: 0.075, gain: 0.05, attack: 0.01 });
-  playTone({ freq: base * 0.72, type: 'sine', duration: 0.09, gain: 0.04, start: 0.06, attack: 0.01 });
-}
-
-// The scrubbing sound is a stream of quiet "blubble" blips rather than a
-// one-shot: updateScrubSound() is called once per frame from tick() and,
-// whenever handleMove() reports an actual scrub against the plate
-// (state.lastScrubSoundAt), fires off another blubble at a randomised
-// interval so it doesn't sound like a mechanical loop.
-let lastBlubbleAt = 0;
-let nextBlubbleDelayMs = 0;
-
-function updateScrubSound() {
-  if (!audioCtx) return;
-  const now = performance.now();
-  const scrubbingNow = now - state.lastScrubSoundAt < 120;
-  if (!scrubbingNow) return;
-  if (now - lastBlubbleAt >= nextBlubbleDelayMs) {
-    playBlubble();
-    lastBlubbleAt = now;
-    nextBlubbleDelayMs = 90 + Math.random() * 110;
-  }
-}
-
 const CANVAS_W = canvas.width;
 const CANVAS_H = canvas.height;
 // Kept short enough to clear the Stacks container's top edge (see
@@ -326,7 +129,6 @@ function ensureStackSpace() {
       startTime: performance.now(),
       duration: 2500,
     };
-    playKaChing();
   }
 }
 
@@ -704,20 +506,9 @@ function baselinePlatesForRound(round) {
   return round + 4; // round 1 = 5 plates, +1 plate per round after that
 }
 
-// Hard safety cap on plates in any single round, regardless of what the
-// upgrade math above works out to - a backstop in case future upgrades
-// stack on top of the "extra dishes" multiplier below.
-const MAX_PLATES_PER_ROUND = 500;
-
 function platesForRound(round) {
-  const level = state.upgrades.doublePlates || 0;
-  // Linear scaling: each level adds one more full multiple of the
-  // baseline rather than doubling the whole count again (which used to
-  // compound to 2^level - 1024x at max level, ~40,000 plates in round 35).
-  // At max level (10) this is a flat 11x, landing a fully-upgraded round 35
-  // around ~430 plates - a big, satisfying pile without being unplayable.
-  const multiplier = 1 + level;
-  return Math.min(MAX_PLATES_PER_ROUND, baselinePlatesForRound(round) * multiplier);
+  const doubleLevel = state.upgrades.doublePlates || 0;
+  return baselinePlatesForRound(round) * Math.pow(2, doubleLevel);
 }
 
 // ============================================================================
@@ -864,7 +655,6 @@ const state = {
   stackBonusPopup: null, // { text, startTime, duration } fading bubble shown when a stack fills, see ensureStackSpace()
 
   upgradePressFlash: null, // { id, startTime, duration } brief "pressed" flash right after a buy-button click
-  lastScrubSoundAt: 0, // performance.now() of the last successful scrub-on-plate hit, drives the "blubble" sound - see updateScrubSound()
 
   playerId: getOrCreatePlayerId(), // stable anonymous ID, persisted in localStorage - see PERSISTENCE section above
   runId: null, // set when a run starts/resumes, see the Start Washing / Continue handlers near the bottom of the file
@@ -919,14 +709,14 @@ const UPGRADE_DEFS = [
   {
     id: 'doublePlates',
     name: 'Extra Dishes',
-    description: 'Adds one more full round\'s worth of plates each level (from next round on, capped at 500/round)',
+    description: 'Doubles the number of plates each round (from next round on)',
     baseCost: 50,
     maxLevel: 10,
     apply: () => { /* platesForRound() reads state.upgrades.doublePlates directly */ },
     isMaxed: () => (state.upgrades.doublePlates || 0) >= 10,
     currentValueLabel: (levelOverride) => {
       const lvl = levelOverride != null ? levelOverride : (state.upgrades.doublePlates || 0);
-      return `${1 + lvl}x plates/round`;
+      return `${Math.pow(2, lvl)}x plates/round`;
     },
   },
   {
@@ -997,7 +787,6 @@ function buyUpgrade(def, index) {
   // Recomputed fresh next frame against the NEXT level's (higher) cost.
   state.upgradeAffordableAt[def.id] = null;
   saveSnapshot();
-  playPaPing();
 
   return true;
 }
@@ -1056,15 +845,6 @@ function generateStackOffsets(count) {
   return offsets;
 }
 
-// Spawns the next plate to be washed, rolling for golden odds and playing
-// the "bling" cue on a hit. Centralized so both the round-start spawn and
-// the mid-round respawn (after a plate lands) share the same behavior.
-function spawnActivePlate() {
-  const isGolden = Math.random() < currentGoldenChance();
-  if (isGolden) playGoldenBling();
-  return new Plate(ACTIVE_X, ACTIVE_Y, PLATE_RADIUS, isGolden);
-}
-
 function startRound(roundNum) {
   state.round = roundNum;
   const total = platesForRound(roundNum);
@@ -1077,7 +857,7 @@ function startRound(roundNum) {
   // Note: state.stacks is intentionally NOT reset here - stacks keep filling
   // up across rounds; see ensureStackSpace() for how the oldest one clears.
   state.animatingPlate = null;
-  state.activePlate = spawnActivePlate();
+  state.activePlate = new Plate(ACTIVE_X, ACTIVE_Y, PLATE_RADIUS, Math.random() < currentGoldenChance());
   state.roundComplete = false;
   state.roundFinalElapsedMs = null;
   state.roundFinalBonusEarned = false;
@@ -1085,7 +865,6 @@ function startRound(roundNum) {
 }
 
 function onRoundComplete() {
-  playDaDang();
   state.roundComplete = true;
   state.activePlate = null;
 
@@ -1126,10 +905,8 @@ function onRoundComplete() {
   saveSnapshot();
 
   // Two win conditions, whichever comes first: finishing MAX_ROUNDS, or
-  // maxing out every capped upgrade. The upgrades-maxed condition is also
-  // checked after every single plate lands (see updatePlateAnimation()), so
-  // in practice it fires there first; the check is repeated here only as a
-  // fallback (e.g. a round that starts with every upgrade already maxed).
+  // maxing out every capped upgrade. Show the game-over/stats screen
+  // instead of the usual round-complete panel when either is met.
   if (state.round >= MAX_ROUNDS || allUpgradesMaxed()) {
     const reason = state.round >= MAX_ROUNDS
       ? `You completed all ${MAX_ROUNDS} rounds!`
@@ -1193,7 +970,6 @@ function showGameOverScreen(reason) {
 }
 
 nextRoundBtn.addEventListener('click', () => {
-  playDangDa();
   startRound(state.round + 1);
 });
 
@@ -1233,7 +1009,6 @@ function updatePlateAnimation() {
 
   if (t >= 1) {
     state.animatingPlate = null;
-    playClink();
     const baseReward = anim.plate.isGolden ? GOLD_REWARD : NORMAL_REWARD;
     const reward = baseReward * state.rewardMultiplier;
     state.platesCleaned += reward;
@@ -1244,20 +1019,10 @@ function updatePlateAnimation() {
     state.washTimestamps.push(performance.now());
     state.stacks[anim.targetStackIndex].push(anim.plate.isGolden);
 
-    // One of the two win conditions (the other is finishing MAX_ROUNDS,
-    // checked in onRoundComplete()) is maxing out every upgrade. Checked
-    // here, right after every single plate lands, so the game ends on the
-    // exact plate that completes the last upgrade - not stalled until
-    // whatever round happens to be in progress finishes.
-    if (allUpgradesMaxed()) {
-      showGameOverScreen('You maxed out every upgrade!');
-      return;
-    }
-
     if (state.stackRemaining > 0) {
       state.stackRemaining -= 1;
       state.stackOffsets.shift();
-      state.activePlate = spawnActivePlate();
+      state.activePlate = new Plate(ACTIVE_X, ACTIVE_Y, PLATE_RADIUS, Math.random() < currentGoldenChance());
     } else {
       onRoundComplete();
     }
@@ -1286,20 +1051,8 @@ function handleMove(x, y) {
   state.mouseY = y;
   state.isScrubbing = true;
   if (!state.roundComplete && state.activePlate) {
-    const plate = state.activePlate;
-    const scrubbed = plate.scrubAt(x, y, state.spongeRadius, state.scrubEfficiency);
-    if (scrubbed) {
-      // scrubAt() itself hit-tests against the plate's square canvas bounds
-      // (for grime-drawing simplicity), so it returns true even in the
-      // corners outside the round plate. The scrub sound should only play
-      // when the sponge circle actually overlaps the round plate, i.e. the
-      // distance between their centers is within the sum of their radii.
-      const overPlate = Math.hypot(x - plate.cx, y - plate.cy) <= plate.radius + state.spongeRadius;
-      if (overPlate) {
-        state.lastScrubSoundAt = performance.now(); // drives the "blubble" sound - see updateScrubSound()
-      }
-      if (Math.random() < 0.4) spawnBubble(x, y);
-    }
+    const scrubbed = state.activePlate.scrubAt(x, y, state.spongeRadius, state.scrubEfficiency);
+    if (scrubbed && Math.random() < 0.4) spawnBubble(x, y);
   }
 }
 
@@ -1307,13 +1060,7 @@ canvas.addEventListener('mousemove', (e) => {
   const { x, y } = getCanvasCoords(e.clientX, e.clientY);
   handleMove(x, y);
 });
-canvas.addEventListener('mouseleave', () => {
-  state.isScrubbing = false;
-  // Push off-canvas so the Upgrades panel doesn't keep showing a hover
-  // highlight/tooltip at the last position the mouse was seen.
-  state.mouseX = -9999;
-  state.mouseY = -9999;
-});
+canvas.addEventListener('mouseleave', () => { state.isScrubbing = false; });
 
 canvas.addEventListener('touchstart', (e) => {
   e.preventDefault();
@@ -1337,13 +1084,8 @@ window.addEventListener('touchend', () => { state.isScrubbing = false; });
 function tryBuyUpgradeAt(x, y) {
   if (!state.gameStarted || state.gameOver) return;
   for (let i = 0; i < UPGRADE_DEFS.length; i++) {
-    // The whole upgrade card is the hit target, not just the small "Buy"
-    // button - with a bigger sponge covering the panel, landing a click
-    // precisely on the button became fiddly. buyUpgrade() itself still
-    // silently no-ops for locked/maxed/unaffordable upgrades, so widening
-    // the target is safe.
-    const item = upgradeItemRect(i);
-    if (x >= item.x && x <= item.x + item.w && y >= item.y && y <= item.y + item.h) {
+    const btn = upgradeButtonRect(i);
+    if (x >= btn.x && x <= btn.x + btn.w && y >= btn.y && y <= btn.y + btn.h) {
       const def = UPGRADE_DEFS[i];
       if (buyUpgrade(def, i)) {
         state.upgradePressFlash = { id: def.id, startTime: performance.now(), duration: 150 };
@@ -1525,13 +1267,6 @@ function drawUpgradesPanel() {
   ctx.textAlign = 'left';
   ctx.restore();
 
-  // Hovered upgrade card (if any) - the whole card lights up, and its full
-  // buy/locked/maxed label gets drawn as a tooltip after the loop so it's
-  // always fully legible even when the button itself is too small to fit
-  // the whole string at readable size.
-  let hoveredItem = null;
-  let hoveredLabel = null;
-
   UPGRADE_DEFS.forEach((def, index) => {
     const item = upgradeItemRect(index);
     const unlocked = isUpgradeUnlocked(index);
@@ -1541,14 +1276,11 @@ function drawUpgradesPanel() {
     const affordable = unlocked && !maxed && state.platesCleaned >= cost;
     const maxLevelLabel = def.maxLevel != null ? def.maxLevel : '∞';
 
-    const hovered = state.mouseX >= item.x && state.mouseX <= item.x + item.w
-      && state.mouseY >= item.y && state.mouseY <= item.y + item.h;
-
     ctx.save();
-    ctx.fillStyle = hovered ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.06)';
+    ctx.fillStyle = 'rgba(255,255,255,0.06)';
     roundRect(ctx, item.x, item.y, item.w, item.h, 6);
     ctx.fill();
-    ctx.strokeStyle = hovered ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.12)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
     ctx.lineWidth = 1;
     roundRect(ctx, item.x, item.y, item.w, item.h, 6);
     ctx.stroke();
@@ -1588,65 +1320,22 @@ function drawUpgradesPanel() {
       label = `Buy ${def.currentValueLabel(level + 1)} for ${cost} plates`;
       kind = affordable ? 'buy' : 'unaffordable';
     }
-    drawUpgradeButton(def, index, btn, label, kind, hovered);
-
-    if (hovered) {
-      hoveredItem = item;
-      hoveredLabel = label;
-    }
+    drawUpgradeButton(def, index, btn, label, kind);
   });
-
-  if (hoveredItem && hoveredLabel) {
-    drawUpgradeTooltip(hoveredItem, hoveredLabel);
-  }
-}
-
-// Full-size popup showing exactly what a hovered upgrade card's button
-// would do (its complete label - the button itself may have had to shrink
-// this text down to fit). Anchored just to the right of the panel, in the
-// game area, and clamped so it never runs off the canvas.
-function drawUpgradeTooltip(item, label) {
-  ctx.save();
-  ctx.font = 'bold 13px Segoe UI, Arial, sans-serif';
-  const paddingX = 10;
-  const boxH = 30;
-  const boxW = ctx.measureText(label).width + paddingX * 2;
-
-  let x = item.x + item.w + 12;
-  let y = item.y + item.h / 2 - boxH / 2;
-  if (x + boxW > CANVAS_W - 8) x = CANVAS_W - 8 - boxW;
-  if (y < 8) y = 8;
-  if (y + boxH > CANVAS_H - 8) y = CANVAS_H - 8 - boxH;
-
-  ctx.fillStyle = 'rgba(15,25,30,0.94)';
-  roundRect(ctx, x, y, boxW, boxH, 6);
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-  ctx.lineWidth = 1;
-  roundRect(ctx, x, y, boxW, boxH, 6);
-  ctx.stroke();
-
-  ctx.fillStyle = '#ffffff';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(label, x + paddingX, y + boxH / 2 + 1);
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'alphabetic';
-  ctx.restore();
 }
 
 // Draws one upgrade's buy button, including a brief darkened "pressed"
 // flash right after a click on it fires a purchase (see the canvas
 // 'click' listener above).
-function drawUpgradeButton(def, index, rect, label, kind, hovered = false) {
+function drawUpgradeButton(def, index, rect, label, kind) {
   const pressed = state.upgradePressFlash
     && state.upgradePressFlash.id === def.id
     && (performance.now() - state.upgradePressFlash.startTime) < state.upgradePressFlash.duration;
 
-  let bg = hovered ? '#5c6d68' : '#4a5a56';
+  let bg = '#4a5a56';
   let fg = '#9aa5a2';
-  if (kind === 'buy') { bg = pressed ? '#3d8f66' : (hovered ? '#5ac48f' : '#4caf7d'); fg = '#ffffff'; }
-  else if (kind === 'unaffordable') { bg = hovered ? '#465650' : '#3a4a46'; fg = '#8fa39c'; }
+  if (kind === 'buy') { bg = pressed ? '#3d8f66' : '#4caf7d'; fg = '#ffffff'; }
+  else if (kind === 'unaffordable') { bg = '#3a4a46'; fg = '#8fa39c'; }
 
   ctx.save();
   ctx.fillStyle = bg;
@@ -1835,7 +1524,6 @@ function tick() {
   drawBackground();
   drawStackPile();
   updateUpgradeAvailabilityTracking();
-  updateScrubSound();
 
   const plate = state.activePlate;
   if (plate && !state.animatingPlate) {
@@ -1902,41 +1590,8 @@ function tick() {
 // The render loop itself runs from the very first frame (so the splash
 // screen's animated logo etc. keep going), but startRound() - and
 // therefore any actual gameplay - only fires once.
-// Fades the splash screen out (see .overlay-screen.fading-out in style.css)
-// instead of hiding it instantly, then runs onRevealed() once the fade has
-// actually finished. The delay is short (350ms) but real: it gives the
-// audio engine a moment to be fully up and running - primed already by
-// primeAudioOnFirstGesture()/the click itself - before gameplay that needs
-// sound (the scrubbing "blubble") can actually begin. Falls back to a
-// timeout in case transitionend doesn't fire for any reason (e.g. a
-// reduced-motion setting suppressing the transition), so the game can never
-// get stuck behind a splash screen that failed to disappear.
-function revealGameArea(onRevealed) {
-  const FADE_MS = 350;
-  splashScreen.classList.add('fading-out');
-  let done = false;
-  const finish = () => {
-    if (done) return;
-    done = true;
-    splashScreen.removeEventListener('transitionend', onTransitionEnd);
-    splashScreen.classList.remove('fading-out');
-    splashScreen.classList.add('hidden');
-    onRevealed();
-  };
-  const onTransitionEnd = (e) => {
-    if (e.target === splashScreen && e.propertyName === 'opacity') finish();
-  };
-  splashScreen.addEventListener('transitionend', onTransitionEnd);
-  setTimeout(finish, FADE_MS + 100);
-}
-
 startWashingBtn.addEventListener('click', () => {
   if (state.gameStarted) return;
-  // Played immediately on click - by now the context has likely already
-  // been resumed by primeAudioOnFirstGesture() (fired on this same click's
-  // pointerdown, slightly earlier), so this should fire with no delay.
-  ensureAudioContext();
-  whenAudioRunning(playLetsGo);
   // Starting fresh abandons any part-completed run rather than silently
   // leaving it orphaned in storage - logged so it's distinguishable from a
   // normal completed/finished run in the telemetry.
@@ -1955,16 +1610,13 @@ startWashingBtn.addEventListener('click', () => {
   state.runId = createId();
   logEvent({ type: 'run_start', playerId: state.playerId, runId: state.runId, timestamp: Date.now() });
   state.gameStarted = true;
-  revealGameArea(() => {
-    startRound(1);
-    saveSnapshot();
-  });
+  splashScreen.classList.add('hidden');
+  startRound(1);
+  saveSnapshot();
 });
 
 continueBtn.addEventListener('click', () => {
   if (state.gameStarted) return;
-  ensureAudioContext();
-  whenAudioRunning(playLetsGo);
   const snapshot = loadSnapshot();
   if (!snapshot) return;
   applySnapshotToState(snapshot);
@@ -1976,12 +1628,11 @@ continueBtn.addEventListener('click', () => {
     round: state.round,
   });
   state.gameStarted = true;
+  splashScreen.classList.add('hidden');
   // Restarts the round the player was on with a fresh dirty plate/pile -
   // see applySnapshotToState()'s comment for why mid-plate progress can't
   // be restored, and startRound() for why this leaves state.stacks alone.
-  revealGameArea(() => {
-    startRound(state.round);
-  });
+  startRound(state.round);
 });
 
 // Offer "Continue" only if a resumable save actually exists.

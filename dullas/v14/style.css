@@ -117,16 +117,6 @@ html, body {
   align-items: center;
   justify-content: center;
   background: radial-gradient(circle at 50% 35%, #3d5866 0%, #24363f 70%, #1a2830 100%);
-  opacity: 1;
-  transition: opacity 0.35s ease;
-}
-
-/* Briefly fading out (see revealGameArea() in game.js) rather than
-   disappearing instantly - the fade buys a moment for the audio engine to
-   finish spinning up before the player can actually start scrubbing. */
-.overlay-screen.fading-out {
-  opacity: 0;
-  pointer-events: none;
 }
 
 .overlay-content {
