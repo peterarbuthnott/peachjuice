@@ -221,11 +221,15 @@ function playDangDa() {
 
 // "blubble-blubble" - a soft double-dip bubbly blip, used while actively
 // scrubbing. Each call plays two quick, quiet, slightly-randomised sine
-// dips so repeated calls don't sound mechanically identical.
+// dips so repeated calls don't sound mechanically identical. Pitched a
+// little higher and a touch louder than the original design - low-
+// frequency, very-quiet tones like the first pass used are exactly the
+// range small phone speakers reproduce worst, so on mobile the cue could
+// end up effectively inaudible even though it was technically playing.
 function playBlubble() {
-  const base = 170 + Math.random() * 70;
-  playTone({ freq: base, type: 'sine', duration: 0.075, gain: 0.05, attack: 0.01 });
-  playTone({ freq: base * 0.72, type: 'sine', duration: 0.09, gain: 0.04, start: 0.06, attack: 0.01 });
+  const base = 230 + Math.random() * 90;
+  playTone({ freq: base, type: 'sine', duration: 0.075, gain: 0.07, attack: 0.01 });
+  playTone({ freq: base * 0.72, type: 'sine', duration: 0.09, gain: 0.055, start: 0.06, attack: 0.01 });
 }
 
 // The scrubbing sound is a stream of quiet "blubble" blips rather than a
@@ -238,8 +242,16 @@ let nextBlubbleDelayMs = 0;
 
 function updateScrubSound() {
   if (!audioCtx) return;
+  // Mobile browsers can auto-suspend an idle-ish AudioContext (screen
+  // dimming, backgrounding, power saving) with nothing else re-resuming it
+  // afterwards - cheap to just ask again every frame while this runs.
+  if (audioCtx.state === 'suspended') audioCtx.resume();
   const now = performance.now();
-  const scrubbingNow = now - state.lastScrubSoundAt < 120;
+  // Widened from the original 120ms: touch input on mobile devices often
+  // fires touchmove at a coarser, coalesced rate than desktop mousemove, so
+  // a tight window could see "scrubbingNow" flicker false between events
+  // and starve the cue almost entirely.
+  const scrubbingNow = now - state.lastScrubSoundAt < 220;
   if (!scrubbingNow) return;
   if (now - lastBlubbleAt >= nextBlubbleDelayMs) {
     playBlubble();
