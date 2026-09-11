@@ -11,44 +11,10 @@ html, body {
   overflow: hidden;
 }
 
-#page-layout {
+#game-wrap {
   width: 100%;
   height: 100%;
   display: flex;
-}
-
-#game-wrap {
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-  display: flex;
-}
-
-/* Skyscraper ad panels flank the game area, outside the playing field
-   itself - see index.html's ADSENSE comment block for why this is
-   web-build-only (Steam/Play need different or no ad integration).
-   data-ad-format="auto" + data-full-width-responsive="true" on the <ins>
-   means each ad sizes itself to fill this container, so the panel just
-   needs a sensible fixed width and to center whatever height Google ends
-   up giving it. */
-.skyscraper-ad {
-  width: 160px;
-  flex-shrink: 0;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  background: rgba(0, 0, 0, 0.15);
-}
-
-/* Below this width, showing 160px-wide ad columns on both sides would
-   crowd out the game itself - hide them and let #game-wrap's flex:1 take
-   the full width instead, same as if the ads weren't there at all. */
-@media (max-width: 1200px) {
-  .skyscraper-ad {
-    display: none;
-  }
 }
 
 #game-area {
@@ -85,7 +51,6 @@ html, body {
   text-align: center;
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
   min-width: 280px;
-  max-width: 92vw;
 }
 
 #round-complete-panel.hidden {
@@ -108,16 +73,6 @@ html, body {
   margin-top: -12px;
   font-size: 14px;
   color: #9fd8b8;
-}
-
-/* Inline "postbox" ad in the round-complete popup - see index.html's
-   ADSENSE comment for why this is web-build-only. A 300px medium-rectangle
-   footprint, capped to the popup's own width so it can't force the panel
-   wider than the viewport on a small screen. */
-.medium-rectangle-ad {
-  width: 300px;
-  max-width: 100%;
-  margin: 4px auto 20px;
 }
 
 #next-round-btn {
