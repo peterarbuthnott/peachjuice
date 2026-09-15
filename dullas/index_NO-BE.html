@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="google-adsense-account" content="ca-pub-3498045816038755">
+<title>Dullas Dishwater</title>
+<link rel="stylesheet" href="style.css">
+<!-- ============================================================================
+     ADSENSE - web build only. This whole block (meta tag above + loader
+     script + the two .skyscraper-ad panels below) is a self-contained,
+     easy-to-strip unit: Steam's Terms of Service ban third-party ad
+     monetization outright, so this must NOT ship in the Steam package, and
+     Google Play needs native AdMob (a different integration entirely, via a
+     Capacitor/Cordova wrapper) rather than this web AdSense snippet. Keep
+     ad code isolated here so removing it for those builds is a clean cut.
+
+     Also gated on protocol: opening this file directly (file://) instead of
+     through a web server was leaving the page failing to load at all, since
+     the browser refuses a cross-origin fetch of Google's ad-loader script
+     from a "file://" page. window.__adsenseEnabled is only set true when
+     actually served over http/https, and every ad slot's push() call below
+     checks it first - so opening index.html locally for testing always
+     works, ads or no ads, and nothing changes for a real web deployment.
+     ============================================================================ -->
+<script>
+  (function () {
+    var isWebOrigin = window.location.protocol === 'http:' || window.location.protocol === 'https:';
+    window.__adsenseEnabled = isWebOrigin;
+    if (!isWebOrigin) return;
+    var loader = document.createElement('script');
+    loader.async = true;
+    loader.crossOrigin = 'anonymous';
+    loader.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3498045816038755';
+    document.head.appendChild(loader);
+  })();
+</script>
+</head>
+<body>
+  <div id="page-layout">
+    <!-- Left skyscraper - flanks the game area, outside the playing field itself. -->
+    <div id="ad-panel-left" class="skyscraper-ad">
+      <!-- dullas-lhs -->
+      <ins class="adsbygoogle"
+           style="display:block"
+           data-ad-client="ca-pub-3498045816038755"
+           data-ad-slot="3177356859"
+           data-ad-format="auto"
+           data-full-width-responsive="true"></ins>
+      <script>
+           if (window.__adsenseEnabled) { (adsbygoogle = window.adsbygoogle || []).push({}); }
+      </script>
+    </div>
+
+    <div id="game-wrap">
+      <div id="game-area">
+        <canvas id="game-canvas" width="960" height="640"></canvas>
+
+        <div id="round-complete-panel" class="hidden">
+          <h2 id="round-complete-title">Round Complete!</h2>
+          <p id="round-complete-cleaned"></p>
+          <p id="round-complete-earned"></p>
+          <p id="round-complete-bonus"></p>
+
+          <!-- Inline "postbox" banner ad - stats show first, then this,
+               then the Next Round button stays the clear final action. -->
+          <div id="round-complete-ad" class="medium-rectangle-ad">
+            <!-- dullas-roundend -->
+            <ins class="adsbygoogle"
+                 style="display:block"
+                 data-ad-client="ca-pub-3498045816038755"
+                 data-ad-slot="1342259955"
+                 data-ad-format="auto"
+                 data-full-width-responsive="true"></ins>
+            <script>
+                 if (window.__adsenseEnabled) { (adsbygoogle = window.adsbygoogle || []).push({}); }
+            </script>
+          </div>
+
+          <button id="next-round-btn">Next Round &rarr;</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right skyscraper - flanks the game area on the opposite side. -->
+    <div id="ad-panel-right" class="skyscraper-ad">
+      <!-- dullas-rhs -->
+      <ins class="adsbygoogle"
+           style="display:block"
+           data-ad-client="ca-pub-3498045816038755"
+           data-ad-slot="1672703498"
+           data-ad-format="auto"
+           data-full-width-responsive="true"></ins>
+      <script>
+           if (window.__adsenseEnabled) { (adsbygoogle = window.adsbygoogle || []).push({}); }
+      </script>
+    </div>
+  </div>
+
+  <div id="splash-screen" class="overlay-screen">
+    <div class="overlay-content">
+      <h1 class="dynamic-logo">Dullas Dishwater</h1>
+      <p class="copyright">A game by Robin Andisdad, copyright 2026</p>
+      <p class="game-summary">
+        Grab the sponge and get scrubbing! Hover your mouse over each plate to
+        wash away the grime - no clicking needed. Clean every plate in a round
+        to advance, stack up sudsy plates in the drying stacks, earn plates as
+        currency, and spend them on upgrades to scrub faster, clean bigger
+        areas, earn more per plate, and boost your odds of a rare golden
+        plate. Beat the clock each round for a speed bonus, and see how far
+        you can get before round 35 - or before you've maxed out every
+        upgrade!
+      </p>
+      <button id="start-washing-btn" class="big-action-btn">Start Washing</button>
+      <button id="continue-btn" class="secondary-action-btn hidden">Continue</button>
+    </div>
+  </div>
+
+  <div id="game-over-screen" class="overlay-screen hidden">
+    <div class="overlay-content">
+      <h1 class="dynamic-logo">Dullas Dishwater</h1>
+      <p class="copyright">A game by Robin Andisdad, copyright 2026</p>
+      <p id="game-over-reason" class="game-summary"></p>
+      <div id="game-over-stats"></div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
