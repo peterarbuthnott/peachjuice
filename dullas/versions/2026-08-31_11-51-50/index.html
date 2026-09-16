@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Dish Duty</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="game-wrap">
+    <div id="game-area">
+      <canvas id="game-canvas" width="960" height="640"></canvas>
+
+      <div id="round-complete-panel" class="hidden">
+        <h2 id="round-complete-title">Round Complete!</h2>
+        <p id="round-complete-cleaned"></p>
+        <p id="round-complete-earned"></p>
+        <p id="round-complete-bonus"></p>
+        <button id="next-round-btn">Next Round &rarr;</button>
+      </div>
+    </div>
+
+    <div id="upgrade-panel-wrapper">
+      <button id="upgrade-toggle-btn" aria-label="Toggle upgrades">Upgrades</button>
+      <div id="upgrade-panel">
+        <div id="upgrade-panel-content">
+          <h2>Upgrades</h2>
+          <div id="upgrade-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

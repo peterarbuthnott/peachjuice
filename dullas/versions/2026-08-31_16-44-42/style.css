@@ -1,0 +1,322 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: linear-gradient(180deg, #4a6b7c 0%, #38505c 100%);
+  font-family: "Segoe UI", Arial, sans-serif;
+  overflow: hidden;
+}
+
+#game-wrap {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+#game-area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#game-canvas {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 960 / 640;
+  background: #6e5947;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  cursor: none;
+  touch-action: none;
+}
+
+#round-complete-panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(20, 30, 35, 0.92);
+  color: #fff;
+  padding: 32px 48px;
+  border-radius: 14px;
+  text-align: center;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+  min-width: 280px;
+}
+
+#round-complete-panel.hidden {
+  display: none;
+}
+
+#round-complete-panel h2 {
+  margin: 0 0 8px;
+  font-size: 28px;
+  color: #ffd166;
+}
+
+#round-complete-panel p {
+  margin: 0 0 20px;
+  font-size: 16px;
+  color: #e0e0e0;
+}
+
+#round-complete-bonus {
+  margin-top: -12px;
+  font-size: 14px;
+  color: #9fd8b8;
+}
+
+#next-round-btn {
+  background: #4caf7d;
+  color: #fff;
+  border: none;
+  padding: 12px 28px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+#next-round-btn:hover {
+  background: #5ac48f;
+}
+
+#next-round-btn:active {
+  transform: scale(0.97);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Upgrade panel - a horizontal strip below the play area, always open, so */
+/* it shrinks the game area's height instead of covering any part of it    */
+/* (it previously sat as an overlay on the canvas and covered the          */
+/* cleanliness slider - moved back out here instead).                      */
+/* ---------------------------------------------------------------------- */
+
+#upgrade-panel {
+  flex-shrink: 0;
+  width: 100%;
+  height: min(100px, 15vh);
+  background: rgba(18, 26, 30, 0.96);
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.45);
+  color: #fff;
+}
+
+#upgrade-panel-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 4px 6px;
+  box-sizing: border-box;
+}
+
+#upgrade-panel-content h2 {
+  flex-shrink: 0;
+  margin: 0;
+  font-size: 12px;
+  color: #ffd166;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  /* Flips the vertical text so it reads bottom-to-top instead of the
+     writing-mode default of top-to-bottom. */
+  transform: rotate(180deg);
+}
+
+#upgrade-list {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 4px;
+  height: 100%;
+}
+
+.upgrade-item {
+  flex: 0 0 138px;
+  width: 138px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
+  padding: 4px 8px;
+}
+
+.upgrade-item.locked {
+  opacity: 0.5;
+}
+
+.upgrade-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 1px;
+}
+
+.upgrade-name {
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.upgrade-level {
+  font-size: 10px;
+  color: #9fd8b8;
+}
+
+/* Hidden in the compact strip - name + current value + level already
+   convey the upgrade; the full description doesn't fit at this height.
+   Left in the markup in case a roomier layout wants it back. */
+.upgrade-desc {
+  display: none;
+}
+
+.upgrade-meta {
+  margin: 0 0 3px;
+  font-size: 10px;
+  color: #9fd8b8;
+}
+
+.upgrade-buy-btn {
+  margin-top: 0;
+  width: 100%;
+  background: #4caf7d;
+  color: #fff;
+  border: none;
+  padding: 4px 0;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.upgrade-buy-btn:hover:not(:disabled) {
+  background: #5ac48f;
+}
+
+.upgrade-buy-btn:disabled {
+  background: #4a5a56;
+  color: #9aa5a2;
+  cursor: not-allowed;
+}
+
+/* Generic utility - anything can use this to hide/show itself. */
+.hidden {
+  display: none !important;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Splash screen + game-over/statistics screen - both share the same       */
+/* full-viewport overlay treatment, dynamic logo, and copyright line.      */
+/* ---------------------------------------------------------------------- */
+
+.overlay-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 50% 35%, #3d5866 0%, #24363f 70%, #1a2830 100%);
+}
+
+.overlay-content {
+  max-width: 640px;
+  width: 90%;
+  text-align: center;
+  padding: 32px;
+  color: #fff;
+}
+
+.dynamic-logo {
+  margin: 0 0 6px;
+  font-size: 56px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  background: linear-gradient(90deg, #ffd166, #4caf7d, #6fc7ff, #ffd166);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: logo-shimmer 5s ease-in-out infinite;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+}
+
+@keyframes logo-shimmer {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.copyright {
+  margin: 0 0 22px;
+  font-size: 13px;
+  color: #9fb4bd;
+}
+
+.game-summary {
+  margin: 0 0 28px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #dce8ec;
+}
+
+.big-action-btn {
+  background: #4caf7d;
+  color: #fff;
+  border: none;
+  padding: 18px 48px;
+  font-size: 22px;
+  font-weight: 700;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 8px 28px rgba(76, 175, 125, 0.4);
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.big-action-btn:hover {
+  background: #5ac48f;
+}
+
+.big-action-btn:active {
+  transform: scale(0.97);
+}
+
+#game-over-stats {
+  font-size: 16px;
+  color: #e0e0e0;
+  line-height: 1.8;
+}
+
+#game-over-stats p {
+  margin: 0;
+}
+
+.game-over-upgrades-title {
+  margin-top: 14px !important;
+  font-weight: 600;
+  color: #ffd166;
+}
+
+.game-over-upgrades-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  font-size: 14px;
+  color: #cfe8ff;
+}

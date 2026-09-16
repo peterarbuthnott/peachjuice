@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Dullas Dishwater</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="game-wrap">
+    <div id="game-area">
+      <div id="canvas-stage">
+        <canvas id="game-canvas" width="960" height="640"></canvas>
+
+        <div id="upgrade-panel">
+          <div id="upgrade-panel-content">
+            <h2>Upgrades</h2>
+            <div id="upgrade-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="round-complete-panel" class="hidden">
+        <h2 id="round-complete-title">Round Complete!</h2>
+        <p id="round-complete-cleaned"></p>
+        <p id="round-complete-earned"></p>
+        <p id="round-complete-bonus"></p>
+        <button id="next-round-btn">Next Round &rarr;</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="splash-screen" class="overlay-screen">
+    <div class="overlay-content">
+      <h1 class="dynamic-logo">Dullas Dishwater</h1>
+      <p class="copyright">A game by Robin Andisdad, copyright 2026</p>
+      <p class="game-summary">
+        Grab the sponge and get scrubbing! Hover your mouse over each plate to
+        wash away the grime - no clicking needed. Clean every plate in a round
+        to advance, stack up sudsy plates in the drying stacks, earn plates as
+        currency, and spend them on upgrades to scrub faster, clean bigger
+        areas, earn more per plate, and boost your odds of a rare golden
+        plate. Beat the clock each round for a speed bonus, and see how far
+        you can get before round 35 - or before you've maxed out every
+        upgrade!
+      </p>
+      <button id="start-washing-btn" class="big-action-btn">Start Washing</button>
+    </div>
+  </div>
+
+  <div id="game-over-screen" class="overlay-screen hidden">
+    <div class="overlay-content">
+      <h1 class="dynamic-logo">Dullas Dishwater</h1>
+      <p class="copyright">A game by Robin Andisdad, copyright 2026</p>
+      <p id="game-over-reason" class="game-summary"></p>
+      <div id="game-over-stats"></div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>

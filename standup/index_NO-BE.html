@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The Standup Memory Game (offline fallback)</title>
+<style>
+  :root {
+    --navy: #1e2761;
+    --ice: #cadcfc;
+    --white: #ffffff;
+    --ink: #1b1f2a;
+    --muted: #5b6472;
+    --good: #1e7a3a;
+    --bad: #b3261e;
+    --border: #dfe4ee;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Arial, sans-serif;
+    color: var(--ink);
+    background: var(--white);
+    display: flex;
+    justify-content: center;
+    padding: 32px 16px;
+  }
+  .app { width: 100%; max-width: 520px; }
+  .app-header { text-align: center; margin-bottom: 24px; }
+  .app-header h1 { font-size: 28px; margin: 0 0 6px; color: var(--navy); }
+  .subtitle { margin: 0; color: var(--muted); font-size: 15px; font-style: italic; }
+  .notice {
+    background: #fff7e6;
+    border: 1px solid #f0d9a8;
+    color: #7a5b00;
+    font-size: 13px;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin: 16px 0 24px;
+  }
+  .notice a { color: #7a5b00; }
+  .screen {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 24px;
+  }
+  .lead { font-size: 16px; margin-top: 0; }
+  label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--muted); }
+  input[type="text"] {
+    width: 100%; padding: 10px 12px; font-size: 16px;
+    border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px;
+  }
+  .btn {
+    display: inline-block; width: 100%; padding: 12px 16px; font-size: 16px;
+    font-weight: 600; border-radius: 8px; border: none; cursor: pointer;
+  }
+  .btn-primary { background: var(--navy); color: var(--white); }
+  .btn-primary:hover { opacity: 0.92; }
+  .error { color: var(--bad); font-size: 14px; margin-top: 8px; }
+  .progress { font-size: 13px; color: var(--muted); margin: 0 0 4px; }
+  .source { font-size: 12px; color: var(--muted); margin: 0 0 12px; text-transform: uppercase; letter-spacing: 0.03em; }
+  #question-text { font-size: 20px; line-height: 1.4; margin: 0 0 20px; }
+  .choices { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+  .choice-btn {
+    text-align: left; padding: 12px 14px; font-size: 15px;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--white); cursor: pointer;
+  }
+  .choice-btn:hover:not(:disabled) { border-color: var(--navy); background: var(--ice); }
+  .choice-btn:disabled { cursor: default; }
+  .choice-btn.correct { border-color: var(--good); background: #e6f4ea; font-weight: 600; }
+  .choice-btn.incorrect { border-color: var(--bad); background: #fbe9e7; }
+  .feedback { font-weight: 600; margin-bottom: 16px; }
+  .feedback.correct { color: var(--good); }
+  .feedback.incorrect { color: var(--bad); }
+  .detail { font-size: 14px; color: var(--muted); line-height: 1.5; margin: -8px 0 16px; }
+  .highscore-list { list-style: none; padding: 0; margin: 0 0 24px; counter-reset: rank; }
+  .highscore-list li { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 15px; }
+  .highscore-list li:before { counter-increment: rank; content: counter(rank) "."; color: var(--muted); width: 24px; flex-shrink: 0; }
+  .highscore-list li.me { font-weight: 700; color: var(--navy); }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <h1>The Standup Memory Game</h1>
+      <p class="subtitle">The questions from the left of standup</p>
+    </header>
+
+    <p class="notice">
+      This is an offline fallback copy that needs no server -- high scores here are
+      saved only in this browser, not shared with anyone else. For the real
+      shared leaderboard, play at
+      <a href="https://www.andisdad.net/standup">andisdad.net/standup</a>.
+    </p>
+
+    <main id="screen-root">
+
+      <section id="screen-start" class="screen">
+        <p class="lead">Think you were paying attention at standup? Enter your name and find out.</p>
+        <label for="player-name">Your name</label>
+        <input id="player-name" type="text" maxlength="30" placeholder="e.g. Peter" autocomplete="off" />
+        <button id="btn-start" class="btn btn-primary">Start Quiz</button>
+        <p id="start-error" class="error" hidden></p>
+      </section>
+
+      <section id="screen-question" class="screen" hidden>
+        <p class="progress" id="question-progress"></p>
+        <p class="source" id="question-source"></p>
+        <h2 id="question-text"></h2>
+        <div id="choices" class="choices"></div>
+        <p id="feedback" class="feedback" hidden></p>
+        <p id="answer-detail" class="detail" hidden></p>
+        <button id="btn-next" class="btn btn-primary" hidden>Next</button>
+      </section>
+
+      <section id="screen-results" class="screen" hidden>
+        <h2>Game over, <span id="result-name"></span>!</h2>
+        <p class="lead">You scored <strong id="result-score"></strong> out of <strong id="result-total"></strong>.</p>
+
+        <h3>High Scores (this device only)</h3>
+        <ol id="highscore-list" class="highscore-list"></ol>
+
+        <button id="btn-play-again" class="btn btn-primary">Play Again</button>
+      </section>
+
+    </main>
+  </div>
+
+  <script>
+  (function () {
+    'use strict';
+
+    // Same question bank as the live server's data/questions.json, embedded
+    // here so this page needs no backend at all. Keep in sync by hand if
+    // questions.json changes -- there's no build step wiring these together.
+    var QUESTIONS = [
+      { "id": "q1", "source": "SSRN Standup slide -- Daily Factoid", "question": "Daily Factoid: How many fish are born (or hatched) every second? (no relation to Wales)", "choices": ["2.3 billion", "About a trillion", "Scientists don't know", "230 billion"], "correctIndex": 2, "explanation": "Scientists do not know." },
+      { "id": "q2", "source": "SSRN Standup slide -- Daily Factoid", "question": "How many types of face are there?", "choices": ["Seven", "Five", "Eight", "Ten"], "correctIndex": 0, "explanation": "Seven: oval, round, square, rectangle (oblong), heart, diamond and triangle." },
+      { "id": "q24", "source": "SSRN Standup slide -- Daily Factoid", "question": "How many types of typeface are there?", "choices": ["Three", "Seven", "Ten", "Five"], "correctIndex": 3, "explanation": "Five basic classifications: serif, sans serif, script, monospaced, and display." },
+      { "id": "q3", "source": "SSRN Standup slide -- Daily Factoid", "question": "How many sheep are there in the world, and how many are there in Wales?", "choices": ["800 million worldwide; 3 million in Wales", "1.3 billion worldwide; 9 million in Wales", "2 billion worldwide; 20 million in Wales", "500 million worldwide; 1 million in Wales"], "correctIndex": 1, "explanation": "About 1.3 billion worldwide; roughly 9 million in Wales." },
+      { "id": "q4", "source": "SSRN Standup slide -- Daily Factoid", "question": "How many types of rain are there, and how many Welsh terms are there for rain?", "choices": ["1 type of rain; 10 Welsh terms", "12 types of rain; 50 Welsh terms", "3 types of rain; around 26 Welsh terms", "5 types of rain; 100 Welsh terms"], "correctIndex": 2, "explanation": "There are 3 types of rainfall. Welsh has around 26 traditional words and descriptive terms for rain -- including the favourite, \"Bwrw hen wragedd â ffyn\", literally \"raining old women and sticks\" (the Welsh equivalent of raining cats and dogs)." },
+      { "id": "q5", "source": "SSRN Standup slide -- Daily Factoid", "question": "Around how many species of terrestrial gastropod mollusc are there worldwide, and how many slug species are there in Wales?", "choices": ["35,000 worldwide; 40 in Wales", "10,000 worldwide; 5 in Wales", "100,000 worldwide; 200 in Wales", "5,000 worldwide; 15 in Wales"], "correctIndex": 0, "explanation": "Roughly 35,000 described terrestrial gastropod species worldwide; around 40 slug species occur in Wales/UK, depending on taxonomy and recording scope." },
+      { "id": "q6", "source": "SSRN Standup slide -- Daily Factoid", "question": "Around how many species of bat are there in the world, and how many are there in Wales?", "choices": ["500 worldwide; 3 in Wales", "2,500 worldwide; 30 in Wales", "800 worldwide; 8 in Wales", "1,400 worldwide; 16 in Wales"], "correctIndex": 3, "explanation": "More than 1,400 worldwide; 16 species have been recorded in Wales." },
+      { "id": "q7", "source": "https://en.wikipedia.org/wiki/List_of_local_winds", "question": "Around how many named local winds are there worldwide, and how many are there in Wales?", "choices": ["100 worldwide; Wales has 12", "2,000 worldwide; Wales has 0", "50 worldwide; Wales has 5", "10,000 worldwide; Wales has 200"], "correctIndex": 1, "explanation": "Approximately 2,000 names for local winds and terms are recognized worldwide. The presentation states Wales has 0 -- England has one: the Helm Wind, a north-easterly wind in Cumbria, England." },
+      { "id": "q8", "source": "SSRN Standup slide -- Daily Factoid", "question": "Around how many species of squirrel are there worldwide, and how many are there in Wales?", "choices": ["50 worldwide; 1 in Wales", "1,000 worldwide; 5 in Wales", "200 worldwide; 2 in Wales", "80 worldwide; 3 in Wales"], "correctIndex": 2, "explanation": "More than 200 worldwide; two species in Wales: red and grey squirrels." },
+      { "id": "q9", "source": "SSRN Standup slide -- Daily Factoid", "question": "Are there more cats or dogs in the world?", "choices": ["Dogs", "Cats", "About equal", "Scientists don't know"], "correctIndex": 0, "explanation": "Dogs: approximately 900 million dogs versus roughly 600 million cats." },
+      { "id": "q10", "source": "SSRN Standup slide -- Daily Factoid", "question": "Around how many babies are born each day on Earth, and how many is that per second?", "choices": ["200,000 per day (2.3 per second)", "1 million per day (11 per second)", "50,000 per day (0.6 per second)", "385,000 per day (4.5 per second)"], "correctIndex": 3, "explanation": "About 385,000 per day, or roughly 4.5 per second." },
+      { "id": "q11", "source": "SSRN Standup slide -- Daily Factoid", "question": "What is the largest object in the asteroid belt?", "choices": ["Vesta", "Ceres", "Pallas", "Eros"], "correctIndex": 1, "explanation": "Ceres." },
+      { "id": "q12", "source": "SSRN Standup slide -- Daily Factoid", "question": "What is the largest state in India?", "choices": ["Madhya Pradesh", "Maharashtra", "Rajasthan", "Uttar Pradesh"], "correctIndex": 2, "explanation": "Rajasthan, 342,239 square kilometres." },
+      { "id": "q13", "source": "SSRN Standup slide -- Daily Factoid", "question": "What is the largest desert on Earth?", "choices": ["The Antarctic Desert", "The Sahara", "The Arabian Desert", "The Gobi Desert"], "correctIndex": 0, "explanation": "The Antarctic Desert (Antarctica)." },
+      { "id": "q14", "source": "SSRN Standup slide -- Daily Factoid", "question": "What is the smallest mammal on Earth?", "choices": ["Pygmy marmoset", "Least weasel", "Deer mouse", "Bumblebee bat"], "correctIndex": 3, "explanation": "By skull size and body length, it's the bumblebee bat (Kitti's hog-nosed bat), about 2.5-3 cm long. By mass, the title actually goes to the Etruscan shrew, about 1.8 g." },
+      { "id": "q15", "source": "SSRN Standup slide -- Daily Factoid", "question": "What is the difference between hornets and wasps?", "choices": ["They are unrelated insects", "All hornets are wasps, but not all wasps are hornets", "Wasps are a type of hornet", "There is no difference"], "correctIndex": 1, "explanation": "Hornets are wasps, but not all wasps are hornets." },
+      { "id": "q16", "source": "SSRN Standup slide -- Daily Factoid", "question": "How many Beatles songs are there in the main catalogue released between 1962 and 1970?", "choices": ["180 songs", "250 songs", "213 songs", "199 songs"], "correctIndex": 2, "explanation": "213 songs." },
+      { "id": "q17", "source": "SSRN Standup slide -- Daily Factoid", "question": "How many teams have won the men's FIFA World Cup?", "choices": ["Eight", "Five", "Twelve", "Six"], "correctIndex": 0, "explanation": "Eight national teams." },
+      { "id": "q18", "source": "SSRN Standup slide -- Daily Factoid", "question": "How many tentacles does a squid have?", "choices": ["Eight", "Ten", "Six", "Two"], "correctIndex": 3, "explanation": "Two. Squids have ten appendages in total, but only two are true tentacles -- the other eight are arms." },
+      { "id": "q19", "source": "SSRN Standup slide -- Daily Factoid", "question": "How many tentacles does an octopus have?", "choices": ["Eight", "Zero", "Two", "Ten"], "correctIndex": 1, "explanation": "Zero. An octopus has eight arms, not tentacles -- true tentacles (like a squid's) have suckers only near the tip, and octopus arms don't work that way." },
+      { "id": "q20", "source": "SSRN Standup slide -- Daily Factoid", "question": "How many fish are there in the sea?", "choices": ["500 billion", "1 trillion", "3.5 trillion", "10 trillion"], "correctIndex": 2, "explanation": "About 3.5 trillion. Scientifically, 'fish in the sea' counts only the upper, fishable part of the water column -- it excludes deep-sea species living far below where fishing fleets and most surveys reach." },
+      { "id": "q25", "source": "SSRN Standup slide -- Daily Factoid", "question": "How many bristlemouths are there?", "choices": ["Hundreds of trillions", "A few million", "A few billion", "They are extinct"], "correctIndex": 0, "explanation": "Hundreds of trillions -- likely making the bristlemouth the most numerous vertebrate on Earth. They live deep in the mesopelagic zone, below the depths counted in typical 'fish in the sea' estimates, which is why they don't show up in that headline number." },
+      { "id": "q21", "source": "SSRN Standup slide -- Daily Factoid", "question": "How many toes did a T. rex have?", "choices": ["Two", "Four", "Five", "Three"], "correctIndex": 3, "explanation": "Three main forward-facing toes on each foot, plus a small raised first toe." },
+      { "id": "q22", "source": "SSRN Standup slide -- Daily Factoid", "question": "How many noses does an ant have?", "choices": ["One", "None", "Two", "Four"], "correctIndex": 1, "explanation": "Ants do not have noses; they smell mainly with their antennae." },
+      { "id": "q23", "source": "SSRN Standup slide -- Daily Factoid", "question": "How many ears do axolotls have?", "choices": ["Two", "Four", "None", "One"], "correctIndex": 2, "explanation": "No external ears; they detect vibrations and sound through internal sensory structures." }
+    ];
+
+    var LOCAL_HIGHSCORE_KEY = 'standupMemoryGame.localHighscores';
+    var MAX_LOCAL_HIGHSCORES = 20;
+
+    var screens = {
+      start: document.getElementById('screen-start'),
+      question: document.getElementById('screen-question'),
+      results: document.getElementById('screen-results'),
+    };
+
+    var el = {
+      playerName: document.getElementById('player-name'),
+      btnStart: document.getElementById('btn-start'),
+      startError: document.getElementById('start-error'),
+      questionProgress: document.getElementById('question-progress'),
+      questionSource: document.getElementById('question-source'),
+      questionText: document.getElementById('question-text'),
+      choices: document.getElementById('choices'),
+      feedback: document.getElementById('feedback'),
+      answerDetail: document.getElementById('answer-detail'),
+      btnNext: document.getElementById('btn-next'),
+      resultName: document.getElementById('result-name'),
+      resultScore: document.getElementById('result-score'),
+      resultTotal: document.getElementById('result-total'),
+      highscoreList: document.getElementById('highscore-list'),
+      btnPlayAgain: document.getElementById('btn-play-again'),
+    };
+
+    var state = { playerName: '', currentIndex: 0, score: 0, answered: false };
+
+    function showScreen(name) {
+      Object.keys(screens).forEach(function (key) {
+        screens[key].hidden = key !== name;
+      });
+    }
+
+    function loadLocalHighscores() {
+      try {
+        var raw = window.localStorage.getItem(LOCAL_HIGHSCORE_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveLocalHighscore(entry) {
+      try {
+        var list = loadLocalHighscores();
+        list.push(entry);
+        list.sort(function (a, b) { return b.score - a.score; });
+        window.localStorage.setItem(LOCAL_HIGHSCORE_KEY, JSON.stringify(list.slice(0, MAX_LOCAL_HIGHSCORES)));
+      } catch (e) { /* localStorage unavailable -- just skip saving */ }
+    }
+
+    function startGame() {
+      var name = el.playerName.value.trim();
+      el.startError.hidden = true;
+      if (!name) {
+        el.startError.textContent = 'Please enter your name to start.';
+        el.startError.hidden = false;
+        return;
+      }
+      state = { playerName: name, currentIndex: 0, score: 0, answered: false };
+      showScreen('question');
+      renderQuestion();
+    }
+
+    function renderQuestion() {
+      var q = QUESTIONS[state.currentIndex];
+      el.questionProgress.textContent = 'Question ' + (state.currentIndex + 1) + ' of ' + QUESTIONS.length;
+
+      el.questionSource.innerHTML = '';
+      if (/^https?:\/\//.test(q.source || '')) {
+        var link = document.createElement('a');
+        link.href = q.source;
+        link.textContent = q.source;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        el.questionSource.appendChild(link);
+      } else {
+        el.questionSource.textContent = q.source || '';
+      }
+
+      el.questionText.textContent = q.question;
+      el.choices.innerHTML = '';
+      q.choices.forEach(function (choiceText, index) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'choice-btn';
+        btn.textContent = choiceText;
+        btn.addEventListener('click', function () { submitAnswer(q, index, btn); });
+        el.choices.appendChild(btn);
+      });
+
+      el.feedback.hidden = true;
+      el.answerDetail.hidden = true;
+      el.btnNext.hidden = true;
+      state.answered = false;
+    }
+
+    function submitAnswer(question, choiceIndex, clickedBtn) {
+      if (state.answered) return;
+      state.answered = true;
+
+      var buttons = Array.prototype.slice.call(el.choices.querySelectorAll('.choice-btn'));
+      buttons.forEach(function (b) { b.disabled = true; });
+
+      var correct = choiceIndex === question.correctIndex;
+      if (correct) state.score += 1;
+
+      buttons[question.correctIndex].classList.add('correct');
+      if (!correct) clickedBtn.classList.add('incorrect');
+
+      el.feedback.hidden = false;
+      el.feedback.className = 'feedback ' + (correct ? 'correct' : 'incorrect');
+      el.feedback.textContent = correct ? 'Correct!' : 'Not quite -- the right answer is highlighted above.';
+
+      if (question.explanation) {
+        el.answerDetail.hidden = false;
+        el.answerDetail.textContent = question.explanation;
+      }
+
+      el.btnNext.hidden = false;
+      el.btnNext.textContent = state.currentIndex + 1 < QUESTIONS.length ? 'Next Question' : 'See Results';
+    }
+
+    function nextQuestion() {
+      state.currentIndex += 1;
+      if (state.currentIndex < QUESTIONS.length) {
+        renderQuestion();
+      } else {
+        finishGame();
+      }
+    }
+
+    function finishGame() {
+      saveLocalHighscore({
+        name: state.playerName,
+        score: state.score,
+        totalAnswered: QUESTIONS.length,
+        date: new Date().toISOString(),
+      });
+
+      el.resultName.textContent = state.playerName;
+      el.resultScore.textContent = state.score;
+      el.resultTotal.textContent = QUESTIONS.length;
+
+      renderHighscores();
+      showScreen('results');
+    }
+
+    function renderHighscores() {
+      el.highscoreList.innerHTML = '';
+      var highscores = loadLocalHighscores();
+      if (!highscores.length) {
+        var empty = document.createElement('li');
+        empty.textContent = 'No scores yet on this device -- you could be first!';
+        el.highscoreList.appendChild(empty);
+        return;
+      }
+      highscores.forEach(function (entry) {
+        var li = document.createElement('li');
+        if (entry.name === state.playerName && entry.score === state.score) li.classList.add('me');
+        var label = document.createElement('span');
+        label.textContent = entry.name;
+        var value = document.createElement('span');
+        value.textContent = entry.score + ' / ' + entry.totalAnswered;
+        li.appendChild(label);
+        li.appendChild(value);
+        el.highscoreList.appendChild(li);
+      });
+    }
+
+    function resetToStart() {
+      el.playerName.value = state.playerName || '';
+      showScreen('start');
+    }
+
+    el.btnStart.addEventListener('click', startGame);
+    el.playerName.addEventListener('keydown', function (e) { if (e.key === 'Enter') startGame(); });
+    el.btnNext.addEventListener('click', nextQuestion);
+    el.btnPlayAgain.addEventListener('click', resetToStart);
+
+    showScreen('start');
+  })();
+  </script>
+</body>
+</html>

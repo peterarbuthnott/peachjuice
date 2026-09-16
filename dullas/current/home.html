@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="google-adsense-account" content="ca-pub-3498045816038755">
+<title>Andisdad Games</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+    background: linear-gradient(180deg, #4a6b7c 0%, #38505c 100%);
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: #fff;
+  }
+
+  .wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 64px 24px 48px;
+    text-align: center;
+  }
+
+  .dynamic-logo {
+    margin: 0 0 8px;
+    font-size: 48px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    background: linear-gradient(90deg, #ffd166, #4caf7d, #6fc7ff, #ffd166);
+    background-size: 300% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: logo-shimmer 5s ease-in-out infinite;
+    text-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  @keyframes logo-shimmer {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  .tagline {
+    margin: 0 0 40px;
+    font-size: 15px;
+    color: #9fb4bd;
+  }
+
+  .blurb {
+    font-size: 16px;
+    line-height: 1.7;
+    color: #dce8ec;
+    margin: 0 0 40px;
+  }
+
+  .game-card {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    padding: 28px 28px 32px;
+    margin: 0 0 28px;
+    text-align: left;
+  }
+
+  .game-card h2 {
+    margin: 0 0 6px;
+    font-size: 24px;
+    color: #ffd166;
+  }
+
+  .game-card p {
+    margin: 0 0 20px;
+    font-size: 15px;
+    line-height: 1.6;
+    color: #cfe0d8;
+  }
+
+  .card-links {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  .big-action-btn {
+    display: inline-block;
+    background: #4caf7d;
+    color: #fff;
+    text-decoration: none;
+    border: none;
+    padding: 14px 34px;
+    font-size: 17px;
+    font-weight: 700;
+    border-radius: 12px;
+    cursor: pointer;
+    box-shadow: 0 8px 28px rgba(76, 175, 125, 0.4);
+    transition: background 0.15s ease, transform 0.1s ease;
+  }
+
+  .big-action-btn:hover { background: #5ac48f; }
+  .big-action-btn:active { transform: scale(0.97); }
+
+  .secondary-action-btn {
+    display: inline-block;
+    background: transparent;
+    color: #cfe8ff;
+    text-decoration: none;
+    border: 1.5px solid rgba(207, 232, 255, 0.5);
+    padding: 12px 28px;
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 10px;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+
+  .secondary-action-btn:hover {
+    background: rgba(207, 232, 255, 0.08);
+    border-color: rgba(207, 232, 255, 0.8);
+  }
+
+  .coming-soon {
+    border-style: dashed;
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.1);
+    text-align: center;
+    color: #9fb4bd;
+    font-size: 14px;
+    padding: 22px;
+  }
+
+  .copyright {
+    margin-top: 40px;
+    font-size: 13px;
+    color: #9fb4bd;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1 class="dynamic-logo">Andisdad Games</h1>
+    <p class="tagline">Small games, made for fun.</p>
+
+    <p class="blurb">
+      Two games up and running so far &mdash; more are on the way.
+      Pick something below to play, or check the leaderboards to see how
+      you stack up.
+    </p>
+
+    <div class="game-card">
+      <h2>Dullas Dishwater</h2>
+      <p>
+        Grab the sponge and get scrubbing! Wash plates, earn currency,
+        buy upgrades, and see how far you can get before round 35&nbsp;&mdash;
+        or before you've maxed out every upgrade.
+      </p>
+      <div class="card-links">
+        <a class="big-action-btn" href="/index.html">Play Now</a>
+        <a class="secondary-action-btn" href="/highscores.html">View Highscores</a>
+      </div>
+    </div>
+
+    <div class="game-card">
+      <h2>The Standup Memory Game</h2>
+      <p>
+        Think you were paying attention at standup? Enter your name and
+        find out &mdash; answer questions pulled straight from what came up
+        on the call.
+      </p>
+      <div class="card-links">
+        <a class="big-action-btn" href="/standup/">Start Quiz</a>
+        <a class="secondary-action-btn" href="/standup/highscores.html">View Highscores</a>
+      </div>
+    </div>
+
+    <div class="game-card coming-soon">
+      More games coming soon.
+    </div>
+
+    <p class="copyright">Games by Robin Andisdad, copyright 2026</p>
+  </div>
+</body>
+</html>

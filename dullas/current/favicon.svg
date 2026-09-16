@@ -1,0 +1,32 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="dirtyHalf">
+      <rect x="30" y="6" width="28" height="56" />
+    </clipPath>
+  </defs>
+
+  <!-- clean half of the plate -->
+  <circle cx="30" cy="32" r="21" fill="#f3eee3" stroke="#cfe8ff" stroke-width="2" />
+  <circle cx="30" cy="32" r="14" fill="none" stroke="rgba(0,0,0,0.15)" stroke-width="1.5" />
+
+  <!-- dirty half, clipped to the right side of the same circle -->
+  <g clip-path="url(#dirtyHalf)">
+    <circle cx="30" cy="32" r="21" fill="#8a6b3d" />
+    <ellipse cx="36" cy="24" rx="5" ry="3.4" fill="#6e5330" transform="rotate(20 36 24)" />
+    <ellipse cx="39" cy="37" rx="4.4" ry="3" fill="#5f4a2a" transform="rotate(-15 39 37)" />
+    <ellipse cx="33" cy="42" rx="3.6" ry="2.6" fill="#75592f" transform="rotate(8 33 42)" />
+  </g>
+
+  <!-- a couple of clean sparkle strokes on the clean half -->
+  <g stroke="#ffffff" stroke-width="1.6" opacity="0.8" stroke-linecap="round">
+    <line x1="20" y1="20" x2="16" y2="16" />
+    <line x1="16" y1="24" x2="12" y2="24" />
+  </g>
+
+  <!-- sponge, sticking out over the edge on the dirty side -->
+  <g transform="translate(46,44) rotate(28)">
+    <rect x="-11" y="-7" width="22" height="14" rx="3.5" fill="#f2c94c" stroke="#c9a227" stroke-width="1.6" />
+    <line x1="-7.5" y1="-2.2" x2="7.5" y2="-2.2" stroke="#b4941a" stroke-width="1.2" />
+    <line x1="-7.5" y1="2.2" x2="7.5" y2="2.2" stroke="#b4941a" stroke-width="1.2" />
+  </g>
+</svg>

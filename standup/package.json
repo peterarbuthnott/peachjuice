@@ -1,0 +1,14 @@
+{
+  "name": "standup-memory-game",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Standup Memory Game -- a trivia quiz built from the questions raised on the left of SSRN standup slides.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=0.12.0",
+    "iojs": ">=1.5.1"
+  }
+}

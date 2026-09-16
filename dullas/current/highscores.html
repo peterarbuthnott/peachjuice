@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="google-adsense-account" content="ca-pub-3498045816038755">
+<title>Dullas Dishwater - Highscores</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+    background: linear-gradient(180deg, #4a6b7c 0%, #38505c 100%);
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: #fff;
+  }
+
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 48px 24px 64px;
+  }
+
+  .top-nav {
+    text-align: center;
+    margin-bottom: 8px;
+  }
+
+  .top-nav a {
+    color: #6fc7ff;
+    text-decoration: none;
+    font-size: 14px;
+  }
+  .top-nav a:hover { text-decoration: underline; }
+
+  h1.dynamic-logo {
+    margin: 8px 0 4px;
+    text-align: center;
+    font-size: 40px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    background: linear-gradient(90deg, #ffd166, #4caf7d, #6fc7ff, #ffd166);
+    background-size: 300% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: logo-shimmer 5s ease-in-out infinite;
+  }
+
+  @keyframes logo-shimmer {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  .subtitle {
+    text-align: center;
+    color: #9fb4bd;
+    font-size: 14px;
+    margin: 0 0 36px;
+  }
+
+  .category {
+    margin-bottom: 48px;
+  }
+
+  .category h2 {
+    color: #ffd166;
+    font-size: 22px;
+    margin: 0 0 4px;
+    text-align: center;
+  }
+
+  .category .category-sub {
+    text-align: center;
+    color: #9fb4bd;
+    font-size: 13px;
+    margin: 0 0 20px;
+  }
+
+  .board-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 20px;
+  }
+
+  .board {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    padding: 16px 18px 18px;
+  }
+
+  .board h3 {
+    margin: 0 0 12px;
+    font-size: 15px;
+    color: #cfe8ff;
+    text-align: center;
+  }
+
+  .board table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .board td {
+    padding: 5px 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .board tr:last-child td { border-bottom: none; }
+
+  .rank {
+    width: 22px;
+    color: #9fd8b8;
+    font-weight: 700;
+  }
+
+  .name {
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+  }
+
+  .value {
+    text-align: right;
+    color: #ffd166;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .empty-state {
+    text-align: center;
+    color: #9fb4bd;
+    font-size: 13px;
+    padding: 18px 0;
+  }
+
+  .load-error {
+    text-align: center;
+    color: #e0a0a0;
+    font-size: 14px;
+    margin: 40px 0;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top-nav"><a href="/">&larr; Back to Andisdad Games</a> &nbsp;|&nbsp; <a href="/index.html">Play Dullas Dishwater</a></div>
+    <h1 class="dynamic-logo">Dullas Dishwater</h1>
+    <p class="subtitle">All-time highscores, read live from the server - refresh any time to see the latest.</p>
+
+    <div id="content">
+      <p class="empty-state">Loading highscores&hellip;</p>
+    </div>
+  </div>
+
+  <script>
+    var METRICS = [
+      { key: 'timeTaken', title: 'Time Taken to Complete', unit: '' },
+      { key: 'platesEarned', title: 'Plates Earned', unit: '' },
+      { key: 'platesCleaned', title: 'Plates Cleaned', unit: '' },
+      { key: 'goldenPlates', title: 'Golden Plates', unit: '' },
+    ];
+    var CATEGORIES = [
+      { key: 'roundCompletion', title: 'Round Completion', sub: 'Runs that finished all 35 rounds' },
+      { key: 'upgradeCompletion', title: 'Upgrade Completion', sub: 'Runs that maxed out every upgrade' },
+    ];
+
+    function escapeHtml(str) {
+      var div = document.createElement('div');
+      div.textContent = str == null ? '' : String(str);
+      return div.innerHTML;
+    }
+
+    function formatValue(metricKey, entry) {
+      if (metricKey === 'timeTaken') return escapeHtml(entry.formattedValue || entry.value);
+      return escapeHtml(entry.value) + ' plates';
+    }
+
+    function renderBoard(metric, entries) {
+      var html = '<div class="board"><h3>' + escapeHtml(metric.title) + '</h3>';
+      if (!entries || !entries.length) {
+        html += '<p class="empty-state">No qualifying runs yet</p>';
+      } else {
+        html += '<table><tbody>';
+        for (var i = 0; i < entries.length; i++) {
+          var e = entries[i];
+          html += '<tr>'
+            + '<td class="rank">' + e.rank + '</td>'
+            + '<td class="name">' + escapeHtml(e.name) + '</td>'
+            + '<td class="value">' + formatValue(metric.key, e) + '</td>'
+            + '</tr>';
+        }
+        html += '</tbody></table>';
+      }
+      html += '</div>';
+      return html;
+    }
+
+    function renderCategory(category, data) {
+      var html = '<div class="category">'
+        + '<h2>' + escapeHtml(category.title) + '</h2>'
+        + '<p class="category-sub">' + escapeHtml(category.sub) + '</p>'
+        + '<div class="board-grid">';
+      for (var i = 0; i < METRICS.length; i++) {
+        html += renderBoard(METRICS[i], data ? data[METRICS[i].key] : []);
+      }
+      html += '</div></div>';
+      return html;
+    }
+
+    async function loadLeaderboards() {
+      var contentEl = document.getElementById('content');
+      try {
+        var res = await fetch('/api/leaderboards');
+        if (!res.ok) throw new Error('bad response');
+        var data = await res.json();
+        var html = '';
+        for (var i = 0; i < CATEGORIES.length; i++) {
+          html += renderCategory(CATEGORIES[i], data[CATEGORIES[i].key]);
+        }
+        contentEl.innerHTML = html;
+      } catch (e) {
+        contentEl.innerHTML = '<p class="load-error">Couldn\'t reach the highscores server right now. Try refreshing in a moment.</p>';
+      }
+    }
+
+    loadLeaderboards();
+  </script>
+</body>
+</html>

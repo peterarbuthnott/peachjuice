@@ -1,0 +1,210 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: linear-gradient(180deg, #4a6b7c 0%, #38505c 100%);
+  font-family: "Segoe UI", Arial, sans-serif;
+  overflow: hidden;
+}
+
+#game-wrap {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+#game-area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#game-canvas {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 960 / 640;
+  background: #6e5947;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  cursor: none;
+  touch-action: none;
+}
+
+#round-complete-panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(20, 30, 35, 0.92);
+  color: #fff;
+  padding: 32px 48px;
+  border-radius: 14px;
+  text-align: center;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+  min-width: 280px;
+}
+
+#round-complete-panel.hidden {
+  display: none;
+}
+
+#round-complete-panel h2 {
+  margin: 0 0 8px;
+  font-size: 28px;
+  color: #ffd166;
+}
+
+#round-complete-panel p {
+  margin: 0 0 20px;
+  font-size: 16px;
+  color: #e0e0e0;
+}
+
+#round-complete-bonus {
+  margin-top: -12px;
+  font-size: 14px;
+  color: #9fd8b8;
+}
+
+#next-round-btn {
+  background: #4caf7d;
+  color: #fff;
+  border: none;
+  padding: 12px 28px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+#next-round-btn:hover {
+  background: #5ac48f;
+}
+
+#next-round-btn:active {
+  transform: scale(0.97);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Upgrade panel - a horizontal strip under the play area, always open, so */
+/* it shrinks the game area's height instead of covering anything.        */
+/* ---------------------------------------------------------------------- */
+
+#upgrade-panel {
+  flex-shrink: 0;
+  width: 100%;
+  height: min(115px, 17vh);
+  background: rgba(18, 26, 30, 0.96);
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.45);
+  color: #fff;
+}
+
+#upgrade-panel-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 8px 18px;
+  box-sizing: border-box;
+}
+
+#upgrade-panel-content h2 {
+  flex-shrink: 0;
+  margin: 0;
+  font-size: 13px;
+  color: #ffd166;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+#upgrade-list {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 8px;
+  height: 100%;
+}
+
+.upgrade-item {
+  flex: 0 0 190px;
+  width: 190px;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.upgrade-item.locked {
+  opacity: 0.5;
+}
+
+.upgrade-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 2px;
+}
+
+.upgrade-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.upgrade-level {
+  font-size: 11px;
+  color: #9fd8b8;
+}
+
+/* Hidden in the compact horizontal strip - name + current value + level
+   already convey the upgrade; the full description doesn't fit at this
+   height. Left in the markup in case a roomier layout wants it back. */
+.upgrade-desc {
+  display: none;
+}
+
+.upgrade-meta {
+  margin: 0 0 4px;
+  font-size: 11px;
+  color: #9fd8b8;
+}
+
+.upgrade-buy-btn {
+  margin-top: auto;
+  width: 100%;
+  background: #4caf7d;
+  color: #fff;
+  border: none;
+  padding: 5px 0;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.upgrade-buy-btn:hover:not(:disabled) {
+  background: #5ac48f;
+}
+
+.upgrade-buy-btn:disabled {
+  background: #4a5a56;
+  color: #9aa5a2;
+  cursor: not-allowed;
+}

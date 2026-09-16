@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The Standup Memory Game</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <h1>The Standup Memory Game</h1>
+      <p class="subtitle">The questions from the left of standup</p>
+      <nav class="top-nav">
+        <a href="highscores.html" class="nav-link">High Scores</a>
+        <a href="https://www.andisdad.net/" class="nav-link nav-exit">Exit Quiz</a>
+      </nav>
+    </header>
+
+    <main id="screen-root" class="screen-root">
+
+      <!-- START SCREEN -->
+      <section id="screen-start" class="screen">
+        <p class="lead">Think you were paying attention at standup? Enter your name and find out.</p>
+        <label for="player-name">Your name</label>
+        <input id="player-name" type="text" maxlength="30" placeholder="e.g. Peter" autocomplete="off" />
+        <button id="btn-start" class="btn btn-primary">Start Quiz</button>
+        <p id="start-error" class="error" hidden></p>
+      </section>
+
+      <!-- QUESTION SCREEN -->
+      <section id="screen-question" class="screen" hidden>
+        <p class="progress" id="question-progress"></p>
+        <p class="source" id="question-source"></p>
+        <h2 id="question-text"></h2>
+        <div id="choices" class="choices"></div>
+        <p id="feedback" class="feedback" hidden></p>
+        <p id="answer-detail" class="detail" hidden></p>
+        <button id="btn-next" class="btn btn-primary" hidden>Next</button>
+      </section>
+
+      <!-- RESULTS / HIGHSCORE SCREEN -->
+      <section id="screen-results" class="screen" hidden>
+        <h2>Game over, <span id="result-name"></span>!</h2>
+        <p class="lead">You scored <strong id="result-score"></strong> out of <strong id="result-total"></strong>.</p>
+
+        <h3>High Scores</h3>
+        <ol id="highscore-list" class="highscore-list"></ol>
+        <button id="btn-load-more-scores" class="btn btn-secondary" hidden>Load More</button>
+
+        <button id="btn-play-again" class="btn btn-primary">Play Again</button>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

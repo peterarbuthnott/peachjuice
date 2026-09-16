@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>High Scores -- The Standup Memory Game</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <h1>The Standup Memory Game</h1>
+      <p class="subtitle">The questions from the left of standup</p>
+      <nav class="top-nav">
+        <a href="index.html" class="nav-link">Play the Quiz</a>
+        <a href="https://www.andisdad.net/" class="nav-link nav-exit">Exit Quiz</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="screen">
+        <h2>High Scores</h2>
+        <ol id="highscore-list" class="highscore-list"></ol>
+        <button id="btn-load-more" class="btn btn-secondary" hidden>Load More</button>
+        <p id="highscore-error" class="error" hidden></p>
+      </section>
+    </main>
+  </div>
+
+  <script src="highscores.js"></script>
+</body>
+</html>
