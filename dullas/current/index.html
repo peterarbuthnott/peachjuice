@@ -26,14 +26,66 @@
      ============================================================================ -->
 <script>
   (function () {
+    // ------------------------------------------------------------------
+    // DIAGNOSTIC LOGGING - everything below logs through this one helper
+    // so it's all findable in the console by filtering for "[AdSense]".
+    // Temporary-but-harmless: safe to leave in indefinitely since it's
+    // just console output, but the intent is to remove it again once ad
+    // serving is confirmed working end-to-end.
+    //
+    // Why this exists: every DOM-timing fix tried so far (push-once,
+    // rebuild-per-round, visibility:hidden instead of display:none) has
+    // been aimed at "No slot size for availableWidth=0" as a sizing/
+    // lifecycle bug in OUR code. But the AdSense dashboard for this site
+    // shows it still in "Getting ready" status - i.e. Google hasn't
+    // finished reviewing/approving this property to serve ads at all yet.
+    // A site in that state can throw exactly this same TagError on every
+    // single push() regardless of how correct the surrounding DOM is,
+    // because there's no approved inventory to size a slot against. These
+    // logs are here to tell the two situations apart: if the loader script
+    // itself fails, or every push errors identically regardless of slot/
+    // timing/container width, that points at the account-level "Getting
+    // ready" status rather than anything left to fix in this file.
+    // ------------------------------------------------------------------
+    function log() {
+      var args = Array.prototype.slice.call(arguments);
+      args.unshift('[AdSense]');
+      console.log.apply(console, args);
+    }
+
     var isWebOrigin = window.location.protocol === 'http:' || window.location.protocol === 'https:';
     window.__adsenseEnabled = isWebOrigin;
+    log('protocol =', window.location.protocol, '-> adsenseEnabled =', isWebOrigin);
     if (!isWebOrigin) return;
+
     var loader = document.createElement('script');
     loader.async = true;
     loader.crossOrigin = 'anonymous';
     loader.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3498045816038755';
+    loader.onload = function () {
+      log('loader script loaded OK from', loader.src);
+    };
+    loader.onerror = function (e) {
+      log('loader script FAILED to load from', loader.src, '- this by itself would mean no ads can ever serve (network/ad-blocker/DNS), separate from any "Getting ready" account status', e);
+    };
     document.head.appendChild(loader);
+
+    // Wraps every adsbygoogle.push({}) call with logging of the exact
+    // context at push time (slot id, container/ins dimensions) plus a
+    // try/catch, since the "No slot size" TagError is thrown synchronously
+    // from inside push() itself per its own stack trace - catchable here
+    // rather than only visible as an uncaught error in the console.
+    function pushSlot(ins, label) {
+      var slot = ins.getAttribute('data-ad-slot');
+      var containerWidth = ins.parentElement ? ins.parentElement.offsetWidth : null;
+      log('pushing', label, '- slot:', slot, 'ins.offsetWidth:', ins.offsetWidth, 'ins.style.width:', ins.style.width, 'container.offsetWidth:', containerWidth, 'adsbygoogle queue length before push:', (window.adsbygoogle || []).length);
+      try {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+        log('push() for', label, 'returned normally (this does NOT guarantee the ad actually filled - AdSense fills async; watch for a further TagError logged separately if it fails downstream)');
+      } catch (e) {
+        log('push() for', label, 'THREW synchronously:', e && e.message ? e.message : e, '- if this happens for every slot regardless of size/timing, suspect the AdSense account/site review status ("Getting ready") rather than a DOM bug here');
+      }
+    }
 
     // Pushes one <ins class="adsbygoogle"> to render - but only once it
     // actually has a nonzero width, and only ever once per element.
@@ -49,13 +101,17 @@
     function pushAd(ins) {
       if (!ins || ins.getAttribute('data-ad-pushed') === '1') return;
       var width = ins.offsetWidth || (ins.parentElement ? ins.parentElement.offsetWidth : 0);
-      if (!width) return; // hidden or not laid out yet - leave it for the next attempt
+      if (!width) {
+        log('skipping skyscraper slot', ins.getAttribute('data-ad-slot'), '- zero width (offscreen/narrow window), will retry on next load/resize pass');
+        return;
+      }
       ins.setAttribute('data-ad-pushed', '1');
-      (window.adsbygoogle = window.adsbygoogle || []).push({});
+      pushSlot(ins, 'skyscraper ' + ins.getAttribute('data-ad-slot'));
     }
 
     function pushAllAutoAds() {
       var slots = document.querySelectorAll('.adsbygoogle[data-ad-autopush="1"]');
+      log('pushAllAutoAds() found', slots.length, 'auto-push slot(s)');
       for (var i = 0; i < slots.length; i++) pushAd(slots[i]);
     }
 
@@ -69,25 +125,47 @@
       resizeTimer = setTimeout(pushAllAutoAds, 300);
     });
 
-    // Round-complete ad: its panel is hidden until a round ends, and hidden
-    // again (by startRound()) the moment "Next Round" is clicked - every
-    // single round after the first. That repeated hide/show turned out to
-    // be the real bug: once an <ins> has actually been filled, AdSense
-    // attaches its own resize-tracking to that element, and toggling its
-    // container back to display:none throws this same "No slot size for
-    // availableWidth=0" TagError from INSIDE Google's own script - not from
-    // any push() call here, so pushAd()'s one-shot guard couldn't prevent
-    // it. The fix is to never reuse a pushed <ins> across a hide/show cycle:
-    // this throws the old node away and builds a fresh one every time the
-    // panel is revealed, so there's never a previously-rendered ad left
-    // behind to react to its container disappearing. Also fixed-size rather
-    // than auto/full-width-responsive, since the responsive sizing path is
-    // exactly what carries this resize-tracking behaviour.
+    // Round-complete ad: pushed ONCE per page load, the very first time the
+    // panel is revealed, and never touched again after that.
+    //
+    // Two things were tried before this and both kept throwing AdSense's
+    // "No slot size for availableWidth=0" TagError:
+    //   1. Push once, reuse the same <ins> every round, and just toggle the
+    //      panel's display:none - broke because once an <ins> is filled,
+    //      AdSense attaches its own resize-tracking to it, and collapsing
+    //      its container to display:none throws from inside Google's own
+    //      script.
+    //   2. Destroy and rebuild a fresh <ins> every single round (with or
+    //      without also clearing it right before the hide) - broke anyway,
+    //      because re-requesting the SAME ad slot repeatedly within one
+    //      page session isn't something AdSense supports for a normal
+    //      display unit; it kept failing to size on essentially every
+    //      later attempt regardless of timing.
+    //
+    // The actual fix is in style.css: #round-complete-panel.hidden now uses
+    // visibility:hidden instead of display:none, so the panel (and this ad
+    // inside it) keep a constant, real layout size at all times - the ad's
+    // <ins> never collapses to zero width, whether the panel is showing or
+    // not. That means there's no more "hide" event for Google's resize
+    // tracker to choke on, and no need to ever re-push or rebuild the ad -
+    // it's requested once, left alone, and simply becomes visible/invisible
+    // along with the rest of the panel from then on.
+    var roundCompleteAdPushed = false;
     window.__pushRoundCompleteAd = function () {
+      if (roundCompleteAdPushed) {
+        log('round-complete ad: already pushed once this page load, skipping');
+        return;
+      }
       var container = document.getElementById('round-complete-ad');
-      if (!container) return;
-      if (!container.offsetWidth) return; // panel not actually visible yet
-      container.innerHTML = '';
+      if (!container) {
+        log('round-complete ad: #round-complete-ad not found in the DOM at all');
+        return;
+      }
+      if (!container.offsetWidth) {
+        log('round-complete ad: container.offsetWidth is 0 - panel not visible yet, will retry on the next round complete');
+        return;
+      }
+      roundCompleteAdPushed = true;
       var ins = document.createElement('ins');
       ins.className = 'adsbygoogle';
       ins.style.display = 'inline-block';
@@ -96,8 +174,26 @@
       ins.setAttribute('data-ad-client', 'ca-pub-3498045816038755');
       ins.setAttribute('data-ad-slot', '1342259955');
       container.appendChild(ins);
-      (window.adsbygoogle = window.adsbygoogle || []).push({});
+      pushSlot(ins, 'round-complete 1342259955');
     };
+
+    // Global catch-all: the "No slot size" TagError has shown up as an
+    // *uncaught* error in the console even with the try/catch in pushSlot()
+    // above in place, which means at least one occurrence of it is being
+    // thrown asynchronously from inside Google's own script (e.g. from a
+    // callback or observer they attach after push() returns), not
+    // synchronously from the push() call itself - so it can slip past a
+    // try/catch wrapped only around push(). This listener won't stop that
+    // error, but logs it with a timestamp and origin so it's easier to
+    // correlate against the other [AdSense] log lines above/below it and
+    // see exactly which slot/state it happened alongside.
+    window.addEventListener('error', function (e) {
+      var msg = e && e.message ? e.message : '';
+      var src = e && e.filename ? e.filename : '';
+      if (msg.indexOf('adsbygoogle') !== -1 || src.indexOf('adsbygoogle') !== -1 || src.indexOf('googlesyndication') !== -1) {
+        log('window "error" event from AdSense script at', new Date().toISOString(), '-', msg, '(', src, ')');
+      }
+    });
   })();
 </script>
 </head>

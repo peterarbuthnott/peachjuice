@@ -1,0 +1,6 @@
+{
+  "name": "Nominate",
+  "description": "A high-fidelity mobile-first scoring card and tracker for Nomination Whist, featuring interactive iPhone and Android device previews and game/player data saved to local JSON files.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

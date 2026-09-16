@@ -88,8 +88,24 @@ html, body {
   max-width: 92vw;
 }
 
+/* Overrides the generic .hidden utility (display:none !important) for this
+   one panel specifically - both declarations are !important, so this wins
+   on specificity (#id.class beats .class alone). The round-complete ad's
+   <ins> lives inside this panel and is only ever pushed to AdSense ONCE
+   (see window.__pushRoundCompleteAd() in index.html) - ads aren't meant to
+   be re-requested into the same slot repeatedly within one page session,
+   and every attempt at rebuilding/re-pushing it each round kept throwing
+   AdSense's "No slot size for availableWidth=0" TagError one way or
+   another. display:none would also collapse the ad to zero size every
+   time this panel closes, which is its own trigger for that same error.
+   visibility:hidden avoids both: the panel (and its ad) keep a constant,
+   real layout size at all times - invisible and non-interactive when
+   "hidden", but never zero-sized - so the ad can be pushed once and simply
+   left alone, visible or not, for the rest of the session. */
 #round-complete-panel.hidden {
-  display: none;
+  display: block !important;
+  visibility: hidden !important;
+  pointer-events: none;
 }
 
 #round-complete-panel h2 {

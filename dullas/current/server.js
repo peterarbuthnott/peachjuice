@@ -84,6 +84,21 @@ try {
   console.error('/standup will 404 until this path is fixed (see STANDUP_SERVER_PATH above).');
 }
 
+// Same mounting trick for the Nomination Whist scoring app: its own
+// server.js exports createHandler(basePath), strips the "/nominate" prefix
+// internally, and serves its own static files and /api/* routes from its
+// own directory, independent of this file's ROOT_DIR/DATA_DIR. Adjust
+// NOMINATE_SERVER_PATH below if the nominate-app folder doesn't live as a
+// sibling of this dullas folder.
+var NOMINATE_SERVER_PATH = path.join(ROOT_DIR, '..', 'nominate-app', 'server.js');
+var nominateHandler = null;
+try {
+  nominateHandler = require(NOMINATE_SERVER_PATH).createHandler('/nominate');
+} catch (e) {
+  console.error('Could not load the nominate game from ' + NOMINATE_SERVER_PATH + ': ' + e.message);
+  console.error('/nominate will 404 until this path is fixed (see NOMINATE_SERVER_PATH above).');
+}
+
 // HTTPS is optional - see the "HTTPS" block near the bottom of this file.
 var HTTPS_PORT = process.env.HTTPS_PORT || 443;
 var HTTPS_CERT_FILE = process.env.HTTPS_CERT_FILE || path.join(ROOT_DIR, 'certs', 'fullchain.pem');
@@ -160,6 +175,13 @@ var MIME_TYPES = {
   '.jpg': 'image/jpeg',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
+  // Without this, ads.txt (and any other .txt file) fell through to the
+  // 'application/octet-stream' default below - confirmed live by fetching
+  // https://www.andisdad.net/ads.txt directly. Google's ads.txt crawler is
+  // known to be picky about this; serving it as a generic binary download
+  // rather than plain text is a plausible contributor to the AdSense
+  // dashboard showing this site stuck in "Getting ready".
+  '.txt': 'text/plain; charset=utf-8',
 };
 
 function serveStatic(req, res) {
@@ -422,6 +444,10 @@ function requestHandler(req, res) {
   var urlPath = req.url.split('?')[0];
   if (standupHandler && (urlPath === '/standup' || urlPath.indexOf('/standup/') === 0)) {
     standupHandler(req, res);
+    return;
+  }
+  if (nominateHandler && (urlPath === '/nominate' || urlPath.indexOf('/nominate/') === 0)) {
+    nominateHandler(req, res);
     return;
   }
   if (req.method === 'POST' && urlPath === '/api/score') { handlePostScore(req, res); return; }

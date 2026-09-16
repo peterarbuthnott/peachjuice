@@ -1,0 +1,604 @@
+[
+  {
+    "id": "ycem86h37",
+    "status": "completed",
+    "currentRound": 19,
+    "roundState": 0,
+    "numberOfPlayers": 2,
+    "players": [
+      {
+        "name": "Peter",
+        "isDealer": false,
+        "currentScore": 135,
+        "madeBids": 16,
+        "roundScores": {
+          "1": {
+            "tricksNominated": 1,
+            "tricksWon": 1,
+            "score": 11,
+            "madeBid": true
+          },
+          "2": {
+            "tricksNominated": 1,
+            "tricksWon": 1,
+            "score": 11,
+            "madeBid": true
+          },
+          "3": {
+            "tricksNominated": 2,
+            "tricksWon": 2,
+            "score": 12,
+            "madeBid": true
+          },
+          "4": {
+            "tricksNominated": 2,
+            "tricksWon": 2,
+            "score": 12,
+            "madeBid": true
+          },
+          "5": {
+            "tricksNominated": 3,
+            "tricksWon": 3,
+            "score": 13,
+            "madeBid": true
+          },
+          "6": {
+            "tricksNominated": 4,
+            "tricksWon": 4,
+            "score": 14,
+            "madeBid": true
+          },
+          "7": {
+            "tricksNominated": 5,
+            "tricksWon": 5,
+            "score": 15,
+            "madeBid": true
+          },
+          "8": {
+            "tricksNominated": 0,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": true
+          },
+          "9": {
+            "tricksNominated": 0,
+            "tricksWon": 7,
+            "score": -21,
+            "madeBid": false
+          },
+          "10": {
+            "tricksNominated": 0,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": true
+          },
+          "11": {
+            "tricksNominated": 0,
+            "tricksWon": 7,
+            "score": -21,
+            "madeBid": false
+          },
+          "12": {
+            "tricksNominated": 3,
+            "tricksWon": 3,
+            "score": 13,
+            "madeBid": true
+          },
+          "13": {
+            "tricksNominated": 4,
+            "tricksWon": 4,
+            "score": 14,
+            "madeBid": true
+          },
+          "14": {
+            "tricksNominated": 3,
+            "tricksWon": 3,
+            "score": 13,
+            "madeBid": true
+          },
+          "15": {
+            "tricksNominated": 3,
+            "tricksWon": 3,
+            "score": 13,
+            "madeBid": true
+          },
+          "16": {
+            "tricksNominated": 3,
+            "tricksWon": 3,
+            "score": 13,
+            "madeBid": true
+          },
+          "17": {
+            "tricksNominated": 2,
+            "tricksWon": 2,
+            "score": 12,
+            "madeBid": true
+          },
+          "18": {
+            "tricksNominated": 1,
+            "tricksWon": 1,
+            "score": 11,
+            "madeBid": true
+          }
+        }
+      },
+      {
+        "name": "Robin",
+        "isDealer": true,
+        "currentScore": -23,
+        "madeBids": 2,
+        "roundScores": {
+          "1": {
+            "tricksNominated": 1,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": false
+          },
+          "2": {
+            "tricksNominated": 2,
+            "tricksWon": 1,
+            "score": 1,
+            "madeBid": false
+          },
+          "3": {
+            "tricksNominated": 2,
+            "tricksWon": 1,
+            "score": 1,
+            "madeBid": false
+          },
+          "4": {
+            "tricksNominated": 3,
+            "tricksWon": 2,
+            "score": 2,
+            "madeBid": false
+          },
+          "5": {
+            "tricksNominated": 3,
+            "tricksWon": 2,
+            "score": 2,
+            "madeBid": false
+          },
+          "6": {
+            "tricksNominated": 0,
+            "tricksWon": 2,
+            "score": 2,
+            "madeBid": false
+          },
+          "7": {
+            "tricksNominated": 3,
+            "tricksWon": 2,
+            "score": 2,
+            "madeBid": false
+          },
+          "8": {
+            "tricksNominated": 0,
+            "tricksWon": 7,
+            "score": -21,
+            "madeBid": false
+          },
+          "9": {
+            "tricksNominated": 0,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": true
+          },
+          "10": {
+            "tricksNominated": 0,
+            "tricksWon": 7,
+            "score": -21,
+            "madeBid": false
+          },
+          "11": {
+            "tricksNominated": 0,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": true
+          },
+          "12": {
+            "tricksNominated": 5,
+            "tricksWon": 4,
+            "score": 4,
+            "madeBid": false
+          },
+          "13": {
+            "tricksNominated": 0,
+            "tricksWon": 2,
+            "score": 2,
+            "madeBid": false
+          },
+          "14": {
+            "tricksNominated": 0,
+            "tricksWon": 2,
+            "score": 2,
+            "madeBid": false
+          },
+          "15": {
+            "tricksNominated": 0,
+            "tricksWon": 1,
+            "score": 1,
+            "madeBid": false
+          },
+          "16": {
+            "tricksNominated": 1,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": false
+          },
+          "17": {
+            "tricksNominated": 1,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": false
+          },
+          "18": {
+            "tricksNominated": 1,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": false
+          }
+        }
+      }
+    ],
+    "createdAt": "2026-09-16T16:22:28.947Z",
+    "updatedAt": "2026-09-16T16:26:57.787Z"
+  },
+  {
+    "id": "o8ry144qz",
+    "status": "completed",
+    "currentRound": 19,
+    "roundState": 0,
+    "numberOfPlayers": 3,
+    "players": [
+      {
+        "name": "Peter",
+        "isDealer": false,
+        "currentScore": 147,
+        "madeBids": 16,
+        "roundScores": {
+          "1": {
+            "tricksNominated": 1,
+            "tricksWon": 1,
+            "score": 11,
+            "madeBid": true
+          },
+          "2": {
+            "tricksNominated": 1,
+            "tricksWon": 1,
+            "score": 11,
+            "madeBid": true
+          },
+          "3": {
+            "tricksNominated": 2,
+            "tricksWon": 3,
+            "score": 3,
+            "madeBid": false
+          },
+          "4": {
+            "tricksNominated": 4,
+            "tricksWon": 4,
+            "score": 14,
+            "madeBid": true
+          },
+          "5": {
+            "tricksNominated": 5,
+            "tricksWon": 5,
+            "score": 15,
+            "madeBid": true
+          },
+          "6": {
+            "tricksNominated": 6,
+            "tricksWon": 6,
+            "score": 16,
+            "madeBid": true
+          },
+          "7": {
+            "tricksNominated": 7,
+            "tricksWon": 7,
+            "score": 17,
+            "madeBid": true
+          },
+          "8": {
+            "tricksNominated": 0,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": true
+          },
+          "9": {
+            "tricksNominated": 0,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": true
+          },
+          "10": {
+            "tricksNominated": 0,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": true
+          },
+          "11": {
+            "tricksNominated": 0,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": true
+          },
+          "12": {
+            "tricksNominated": 3,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": false
+          },
+          "13": {
+            "tricksNominated": 0,
+            "tricksWon": 0,
+            "score": 10,
+            "madeBid": true
+          },
+          "14": {
+            "tricksNominated": 0,
+            "tricksWon": 0,
+            "score": 10,
+            "madeBid": true
+          },
+          "15": {
+            "tricksNominated": 0,
+            "tricksWon": 0,
+            "score": 10,
+            "madeBid": true
+          },
+          "16": {
+            "tricksNominated": 0,
+            "tricksWon": 0,
+            "score": 10,
+            "madeBid": true
+          },
+          "17": {
+            "tricksNominated": 0,
+            "tricksWon": 0,
+            "score": 10,
+            "madeBid": true
+          },
+          "18": {
+            "tricksNominated": 0,
+            "tricksWon": 0,
+            "score": 10,
+            "madeBid": true
+          }
+        }
+      },
+      {
+        "name": "Robin",
+        "isDealer": false,
+        "currentScore": 40,
+        "madeBids": 5,
+        "roundScores": {
+          "1": {
+            "tricksNominated": 1,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": false
+          },
+          "2": {
+            "tricksNominated": 1,
+            "tricksWon": 1,
+            "score": 11,
+            "madeBid": true
+          },
+          "3": {
+            "tricksNominated": 2,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": false
+          },
+          "4": {
+            "tricksNominated": 1,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": false
+          },
+          "5": {
+            "tricksNominated": 1,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": false
+          },
+          "6": {
+            "tricksNominated": 1,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": false
+          },
+          "7": {
+            "tricksNominated": 1,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": false
+          },
+          "8": {
+            "tricksNominated": 0,
+            "tricksWon": 2,
+            "score": -6,
+            "madeBid": false
+          },
+          "9": {
+            "tricksNominated": 0,
+            "tricksWon": 2,
+            "score": -6,
+            "madeBid": false
+          },
+          "10": {
+            "tricksNominated": 0,
+            "tricksWon": 2,
+            "score": -6,
+            "madeBid": false
+          },
+          "11": {
+            "tricksNominated": 0,
+            "tricksWon": 2,
+            "score": -6,
+            "madeBid": false
+          },
+          "12": {
+            "tricksNominated": 7,
+            "tricksWon": 7,
+            "score": 17,
+            "madeBid": true
+          },
+          "13": {
+            "tricksNominated": 1,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": false
+          },
+          "14": {
+            "tricksNominated": 1,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": false
+          },
+          "15": {
+            "tricksNominated": 1,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": false
+          },
+          "16": {
+            "tricksNominated": 3,
+            "tricksWon": 3,
+            "score": 13,
+            "madeBid": true
+          },
+          "17": {
+            "tricksNominated": 2,
+            "tricksWon": 2,
+            "score": 12,
+            "madeBid": true
+          },
+          "18": {
+            "tricksNominated": 1,
+            "tricksWon": 1,
+            "score": 11,
+            "madeBid": true
+          }
+        }
+      },
+      {
+        "name": "Charlie",
+        "isDealer": true,
+        "currentScore": 25,
+        "madeBids": 7,
+        "roundScores": {
+          "1": {
+            "tricksNominated": 1,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": false
+          },
+          "2": {
+            "tricksNominated": 1,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": false
+          },
+          "3": {
+            "tricksNominated": 2,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": false
+          },
+          "4": {
+            "tricksNominated": 0,
+            "tricksWon": 0,
+            "score": 10,
+            "madeBid": true
+          },
+          "5": {
+            "tricksNominated": 0,
+            "tricksWon": 0,
+            "score": 10,
+            "madeBid": true
+          },
+          "6": {
+            "tricksNominated": 0,
+            "tricksWon": 0,
+            "score": 10,
+            "madeBid": true
+          },
+          "7": {
+            "tricksNominated": 0,
+            "tricksWon": 0,
+            "score": 10,
+            "madeBid": true
+          },
+          "8": {
+            "tricksNominated": 0,
+            "tricksWon": 5,
+            "score": -15,
+            "madeBid": false
+          },
+          "9": {
+            "tricksNominated": 0,
+            "tricksWon": 5,
+            "score": -15,
+            "madeBid": false
+          },
+          "10": {
+            "tricksNominated": 0,
+            "tricksWon": 5,
+            "score": -15,
+            "madeBid": false
+          },
+          "11": {
+            "tricksNominated": 0,
+            "tricksWon": 5,
+            "score": -15,
+            "madeBid": false
+          },
+          "12": {
+            "tricksNominated": 7,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": false
+          },
+          "13": {
+            "tricksNominated": 6,
+            "tricksWon": 6,
+            "score": 16,
+            "madeBid": true
+          },
+          "14": {
+            "tricksNominated": 5,
+            "tricksWon": 5,
+            "score": 15,
+            "madeBid": true
+          },
+          "15": {
+            "tricksNominated": 4,
+            "tricksWon": 4,
+            "score": 14,
+            "madeBid": true
+          },
+          "16": {
+            "tricksNominated": 1,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": false
+          },
+          "17": {
+            "tricksNominated": 1,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": false
+          },
+          "18": {
+            "tricksNominated": 1,
+            "tricksWon": 0,
+            "score": 0,
+            "madeBid": false
+          }
+        }
+      }
+    ],
+    "createdAt": "2026-09-16T20:20:50.728Z",
+    "updatedAt": "2026-09-16T20:41:11.925Z"
+  }
+]

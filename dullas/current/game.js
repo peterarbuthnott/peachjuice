@@ -1324,6 +1324,11 @@ function startRound(roundNum) {
   state.roundComplete = false;
   state.roundFinalElapsedMs = null;
   state.roundFinalBonusEarned = false;
+  // Note: this "hides" the panel via visibility:hidden, not display:none -
+  // see the #round-complete-panel.hidden override in style.css. That keeps
+  // the round-complete ad's <ins> at a constant, real size at all times, so
+  // it only ever needs to be pushed once (see window.__pushRoundCompleteAd
+  // in index.html) rather than rebuilt/re-pushed every round.
   roundCompletePanel.classList.add('hidden');
 }
 
@@ -1388,13 +1393,13 @@ function onRoundComplete() {
     ? `⏱ Finished in ${formatDuration(elapsed)} - Speed bonus: +${bonusAmount} plates! (target: ${formatMinSec(timeLimitMs)})`
     : `⏱ Finished in ${formatDuration(elapsed)} - too slow for the speed bonus (target: ${formatMinSec(timeLimitMs)})`;
   roundCompletePanel.classList.remove('hidden');
-  // The round-complete ad's <ins> is inside this panel, which was
-  // display:none until the line above - pushing it any earlier throws
-  // AdSense's "No slot size for availableWidth=0" and never fills the
-  // slot. See index.html's ADSENSE block for pushAd()'s own once-only
-  // guard, and window.__pushRoundCompleteAd not existing at all on a
-  // Steam/Play build (ad code stripped there) is exactly why this is
-  // guarded rather than called directly.
+  // window.__pushRoundCompleteAd() (see index.html's ADSENSE block) only
+  // actually does anything the very first time this fires - it pushes the
+  // round-complete ad once and never again, since #round-complete-panel.hidden
+  // now uses visibility:hidden (see style.css) rather than display:none, so
+  // the ad's <ins> never needs re-requesting. window.__pushRoundCompleteAd
+  // not existing at all on a Steam/Play build (ad code stripped there) is
+  // why this is guarded rather than called directly.
   if (window.__pushRoundCompleteAd) window.__pushRoundCompleteAd();
 }
 
@@ -1406,6 +1411,7 @@ function showGameOverScreen(reason) {
   state.roundComplete = true;
   state.activePlate = null;
   state.animatingPlate = null;
+  // See startRound()'s comment - visibility:hidden, not display:none.
   roundCompletePanel.classList.add('hidden');
 
   logEvent({

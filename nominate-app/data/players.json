@@ -1,0 +1,29 @@
+[
+  {
+    "id": "peter",
+    "name": "Peter",
+    "gamesPlayed": 2,
+    "gamesWon": 2,
+    "totalScore": 282,
+    "totalBidsMade": 32,
+    "lastPlayed": "2026-09-16T20:41:11.841Z"
+  },
+  {
+    "id": "robin",
+    "name": "Robin",
+    "gamesPlayed": 2,
+    "gamesWon": 0,
+    "totalScore": 17,
+    "totalBidsMade": 7,
+    "lastPlayed": "2026-09-16T20:41:11.844Z"
+  },
+  {
+    "id": "charlie",
+    "name": "Charlie",
+    "gamesPlayed": 1,
+    "gamesWon": 0,
+    "totalScore": 25,
+    "totalBidsMade": 7,
+    "lastPlayed": "2026-09-16T20:41:11.846Z"
+  }
+]

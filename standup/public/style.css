@@ -11,6 +11,14 @@
 
 * { box-sizing: border-box; }
 
+/* .btn and a few other classes below set their own `display`, which has
+   the same CSS specificity as the browser's built-in `[hidden] { display:
+   none }` rule -- and author styles win specificity ties over the
+   user-agent stylesheet. Without this, an element that's both `.btn` and
+   `hidden` (e.g. the Load More button before there's more to load) stays
+   visible. !important forces `hidden` to always win. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   font-family: -apple-system, "Segoe UI", Arial, sans-serif;

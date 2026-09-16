@@ -1,0 +1,13 @@
+{
+  "name": "nominate",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Nomination Whist scoring app — plain HTML/CSS/JS frontend, plain Node http server, JSON files for storage. No build step, no npm install required.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "server": "node server.js"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
