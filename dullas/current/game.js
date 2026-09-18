@@ -880,6 +880,20 @@ function clearSnapshot() {
   try { localStorage.removeItem(STORAGE_KEYS.save); } catch (e) { /* best effort */ }
 }
 
+// Wipes the local telemetry log outright - called once a run restarts or
+// ends, since that log's contents belong to a run that's now over. Also
+// removes lastSyncedEventCount: that value is an INDEX into the events
+// array, so leaving a stale (larger) index in place after the array is
+// emptied would make the next sync think the new run's first batch of
+// events had already been sent, silently dropping them. Deliberately
+// leaves playerId, playerName, and the save snapshot untouched - those are
+// what let a returning player keep their identity and resumable game;
+// only the append-only event log is being reset here.
+function clearEvents() {
+  try { localStorage.removeItem(STORAGE_KEYS.events); } catch (e) { /* best effort */ }
+  try { localStorage.removeItem(STORAGE_KEYS.lastSyncedEventCount); } catch (e) { /* best effort */ }
+}
+
 // Copies a saved snapshot into live state. Deliberately does NOT try to
 // restore progress on the plate that was mid-scrub when the snapshot was
 // taken - startRound() is called right after this (see the Continue button
@@ -950,10 +964,21 @@ function submitScore(reason) {
 
 // Sends only the events logged since the last successful sync (tracked via
 // STORAGE_KEYS.lastSyncedEventCount), so the same history isn't re-sent
-// wholesale every single game-over - the server-side events.ndjson file
-// stays a clean append of genuinely new events. Called once from
-// showGameOverScreen(); if the request fails, the pointer simply isn't
-// advanced, so the same events are retried at the next game-over.
+// wholesale every single call - the server-side events.ndjson file stays a
+// clean append of genuinely new events. Called from both the Start Washing
+// handler (restart) and showGameOverScreen() (end of run) - in both cases
+// specifically so a run that's only being abandoned or ended still gets
+// its telemetry (including partially-completed runs) onto the server, not
+// just runs that reach a normal game-over.
+//
+// Returns true if there was nothing to send, or the send succeeded; false
+// if there were new events but the request failed (offline, Pi server
+// down/unreachable). Callers use this to decide whether it's safe to wipe
+// the local log yet - see clearEvents()'s call sites. Returning false
+// without touching STORAGE_KEYS.lastSyncedEventCount or the log itself
+// means the exact same events are retried at the NEXT restart or
+// game-over, so a temporary network blip doesn't silently lose a player's
+// partial-run data - it just waits for the next opportunity to sync.
 async function syncEventsToServer() {
   const allEvents = loadAllEvents();
   let lastSynced = 0;
@@ -962,7 +987,7 @@ async function syncEventsToServer() {
   } catch (e) { lastSynced = 0; }
 
   const newEvents = allEvents.slice(lastSynced);
-  if (newEvents.length === 0) return;
+  if (newEvents.length === 0) return true;
 
   const res = await postJson('/api/events', {
     playerId: state.playerId,
@@ -971,7 +996,9 @@ async function syncEventsToServer() {
   });
   if (res && res.ok) {
     try { localStorage.setItem(STORAGE_KEYS.lastSyncedEventCount, String(allEvents.length)); } catch (e) { /* best effort */ }
+    return true;
   }
+  return false;
 }
 
 // Fetches the top-10 board and renders it into #highscore-list. Leaves
@@ -1453,7 +1480,12 @@ function showGameOverScreen(reason) {
   // missing/unreachable server just means no highscore list appears and
   // nothing gets archived server-side this time.
   submitScore(reason);
-  syncEventsToServer();
+  // Archive this run's events on the server, then wipe the local log - but
+  // only once that archive is confirmed (syncEventsToServer() resolves
+  // true). If the server's unreachable right now, leave the log alone so
+  // these events are retried at the next restart or game-over instead of
+  // being lost - see syncEventsToServer()'s comment.
+  syncEventsToServer().then((synced) => { if (synced) clearEvents(); });
   fetchHighscores();
 }
 
@@ -2221,6 +2253,16 @@ startWashingBtn.addEventListener('click', () => {
     });
     clearSnapshot();
   }
+  // Starting a new game abandons whatever run was in progress (if any), so
+  // this is the one chance to get that partial run's telemetry onto the
+  // server before its local trace is cleared - previously this only
+  // happened on a full game-over, so an abandoned/partial run's events
+  // never made it to the server at all. Only wipe the local log once the
+  // server has confirmed receiving it; if it's unreachable right now, the
+  // log is left alone and retried at the next restart or game-over - same
+  // pattern as showGameOverScreen().
+  syncEventsToServer().then((synced) => { if (synced) clearEvents(); });
+
   state.runId = createId();
   state.runStartedAt = Date.now();
   logEvent({ type: 'run_start', playerId: state.playerId, runId: state.runId, timestamp: isoTimestamp() });

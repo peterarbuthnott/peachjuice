@@ -58,6 +58,11 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Backstop for #round-complete-panel, which is absolutely positioned
+     inside this element - see that rule's comment. Its own max-height +
+     overflow-y:auto should keep it on-screen already; this just gives the
+     browser a scroll container to fall back on if it somehow doesn't. */
+  overflow-y: auto;
 }
 
 #game-canvas {
@@ -86,6 +91,25 @@ html, body {
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
   min-width: 280px;
   max-width: 92vw;
+  /* On a short mobile viewport this panel's own content (stats + the
+     inline ad + the button + the exit link) can be taller than the
+     screen. It's centered via top:50%/transform rather than flexbox, and
+     an absolutely-positioned box centered that way can overflow ABOVE its
+     container's top edge - browsers clamp scroll position at 0, so that
+     upper overflow is real but permanently unreachable, not just visually
+     cramped. Capping the panel's own height and letting IT scroll
+     internally keeps the outer box always fully on-screen (so the
+     centering never overflows in the first place) while any content that
+     still doesn't fit scrolls normally, top-anchored, inside the panel -
+     no negative-scroll-offset problem. dvh (the actual visible viewport,
+     which shrinks/grows as mobile browser chrome shows/hides) is tried
+     first; the plain vh line above it is the fallback for browsers that
+     don't support dvh. */
+  max-height: 85vh;
+  max-height: 85dvh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Overrides the generic .hidden utility (display:none !important) for this
@@ -186,6 +210,14 @@ html, body {
   background: radial-gradient(circle at 50% 35%, #3d5866 0%, #24363f 70%, #1a2830 100%);
   opacity: 1;
   transition: opacity 0.35s ease;
+  /* Backstop only - .overlay-content below is capped to fit the viewport
+     and scrolls its own content, so this container shouldn't normally need
+     to scroll itself. Kept here anyway in case a browser's dvh support or
+     an extreme text-zoom setting still leaves .overlay-content taller than
+     this box; without it, that leftover overflow would be centered right
+     off both the top and bottom edges with no way to reach it (a plain
+     fixed+flex-centered box doesn't scroll on its own). */
+  overflow-y: auto;
 }
 
 /* Briefly fading out (see revealGameArea() in game.js) rather than
@@ -202,6 +234,18 @@ html, body {
   text-align: center;
   padding: 32px;
   color: #fff;
+  /* Same fix as #round-complete-panel: cap this box to fit the visible
+     viewport (dvh preferred, vh fallback for older browsers - see that
+     rule's comment for why) and let ITS OWN content scroll once it no
+     longer fits, rather than letting the box grow taller than the screen.
+     The splash screen (long game-summary text + player-name form) and the
+     game-over screen (stats + upgrade list + highscore board) are the two
+     places this was actually being hit on short mobile screens. */
+  max-height: 90vh;
+  max-height: 90dvh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .dynamic-logo {
