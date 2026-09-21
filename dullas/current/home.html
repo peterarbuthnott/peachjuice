@@ -18,11 +18,68 @@
     color: #fff;
   }
 
-  .wrap {
-    max-width: 720px;
+  .page-layout {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 28px;
+    width: 100%;
     margin: 0 auto;
-    padding: 64px 24px 48px;
+    padding: 0 24px;
+  }
+
+  /* Fixed-width ad column, placed left of the centered content. */
+  .ad-rail {
+    order: 1;
+    flex: 0 0 300px;
+    width: 300px;
+    padding-top: 64px;
+    position: sticky;
+    top: 24px;
+  }
+
+  .wrap {
+    order: 2;
+    max-width: 720px;
+    flex: 1 1 720px;
+    min-width: 0;
+    margin: 0;
+    padding: 64px 0 48px;
     text-align: center;
+  }
+
+  /* Invisible spacer the same width as the ad rail, so the content
+     column stays truly centered in the viewport instead of being
+     pushed right by the ad. */
+  .ad-spacer {
+    order: 3;
+    flex: 0 0 300px;
+    width: 300px;
+  }
+
+  @media (max-width: 880px) {
+    .page-layout {
+      flex-direction: column;
+      align-items: center;
+      padding: 0 24px;
+    }
+
+    .ad-rail {
+      order: 2;
+      width: 100%;
+      max-width: 336px;
+      padding-top: 24px;
+      position: static;
+    }
+
+    .wrap {
+      order: 1;
+      padding: 24px 0 48px;
+    }
+
+    .ad-spacer {
+      display: none;
+    }
   }
 
   .dynamic-logo {
@@ -140,7 +197,22 @@
 </style>
 </head>
 <body>
-  <div class="wrap">
+  <div class="page-layout">
+    <aside class="ad-rail">
+      <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3498045816038755" crossorigin="anonymous"></script>
+      <!-- andisdad-home -->
+      <ins class="adsbygoogle"
+           style="display:block"
+           data-ad-client="ca-pub-3498045816038755"
+           data-ad-slot="9134227287"
+           data-ad-format="auto"
+           data-full-width-responsive="true"></ins>
+      <script>
+           (adsbygoogle = window.adsbygoogle || []).push({});
+      </script>
+    </aside>
+
+    <div class="wrap">
     <h1 class="dynamic-logo">Andisdad Games</h1>
     <p class="tagline">Small games, made for fun.</p>
 
@@ -194,6 +266,9 @@
     </div>
 
     <p class="copyright">Games by Robin Andisdad, copyright 2026</p>
+    </div>
+
+    <div class="ad-spacer" aria-hidden="true"></div>
   </div>
 </body>
 </html>
