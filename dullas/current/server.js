@@ -99,6 +99,21 @@ try {
   console.error('/nominate will 404 until this path is fixed (see NOMINATE_SERVER_PATH above).');
 }
 
+// Same mounting trick again for the 4th game, Watch the Drying: its own
+// server.js exports createHandler(basePath), strips the "/drying" prefix
+// internally, and serves its own static files and /api/* routes from its
+// own directory, independent of this file's ROOT_DIR/DATA_DIR. Adjust
+// DRYING_SERVER_PATH below if the drying folder doesn't live as a sibling
+// of this dullas folder.
+var DRYING_SERVER_PATH = path.join(ROOT_DIR, '..', 'drying', 'server.js');
+var dryingHandler = null;
+try {
+  dryingHandler = require(DRYING_SERVER_PATH).createHandler('/drying');
+} catch (e) {
+  console.error('Could not load the drying game from ' + DRYING_SERVER_PATH + ': ' + e.message);
+  console.error('/drying will 404 until this path is fixed (see DRYING_SERVER_PATH above).');
+}
+
 // HTTPS is optional - see the "HTTPS" block near the bottom of this file.
 var HTTPS_PORT = process.env.HTTPS_PORT || 443;
 var HTTPS_CERT_FILE = process.env.HTTPS_CERT_FILE || path.join(ROOT_DIR, 'certs', 'fullchain.pem');
@@ -448,6 +463,10 @@ function requestHandler(req, res) {
   }
   if (nominateHandler && (urlPath === '/nominate' || urlPath.indexOf('/nominate/') === 0)) {
     nominateHandler(req, res);
+    return;
+  }
+  if (dryingHandler && (urlPath === '/drying' || urlPath.indexOf('/drying/') === 0)) {
+    dryingHandler(req, res);
     return;
   }
   if (req.method === 'POST' && urlPath === '/api/score') { handlePostScore(req, res); return; }

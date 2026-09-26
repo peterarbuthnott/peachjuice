@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Watch the Drying - Highscores</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+    background: linear-gradient(180deg, #4a6b7c 0%, #38505c 100%);
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: #fff;
+  }
+
+  .wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 48px 24px 64px;
+  }
+
+  .top-nav {
+    text-align: center;
+    margin-bottom: 8px;
+  }
+
+  .top-nav a {
+    color: #6fc7ff;
+    text-decoration: none;
+    font-size: 14px;
+  }
+  .top-nav a:hover { text-decoration: underline; }
+
+  h1.dynamic-logo {
+    margin: 8px 0 4px;
+    text-align: center;
+    font-size: 38px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    background: linear-gradient(90deg, #ffd166, #4caf7d, #6fc7ff, #ffd166);
+    background-size: 300% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: logo-shimmer 5s ease-in-out infinite;
+  }
+
+  @keyframes logo-shimmer {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  .subtitle {
+    text-align: center;
+    color: #9fb4bd;
+    font-size: 14px;
+    margin: 0 0 36px;
+  }
+
+  .board {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    padding: 16px 18px 18px;
+  }
+
+  .board table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+
+  .board td {
+    padding: 8px 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .board tr:last-child td { border-bottom: none; }
+
+  .rank {
+    width: 26px;
+    color: #9fd8b8;
+    font-weight: 700;
+  }
+
+  .name {
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+  }
+
+  .meta {
+    color: #9fb4bd;
+    font-size: 12px;
+  }
+
+  .value {
+    text-align: right;
+    color: #ffd166;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .load-more-btn {
+    display: block;
+    margin: 20px auto 0;
+    background: transparent;
+    color: #cfe8ff;
+    border: 1.5px solid rgba(207, 232, 255, 0.5);
+    padding: 10px 28px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+
+  .load-more-btn:hover {
+    background: rgba(207, 232, 255, 0.08);
+  }
+
+  .empty-state, .load-error {
+    text-align: center;
+    color: #9fb4bd;
+    font-size: 13px;
+    padding: 18px 0;
+  }
+
+  .hidden {
+    display: none !important;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top-nav"><a href="/">&larr; Back to Andisdad Games</a> &nbsp;|&nbsp; <a href="/drying/">Play Watch the Drying</a></div>
+    <h1 class="dynamic-logo">Watch the Drying</h1>
+    <p class="subtitle">Fastest total time from first brushstroke to fully dry, read live from the server. Looking away pauses the clock, so it's also a patience leaderboard.</p>
+
+    <div class="board">
+      <table id="board-table"><tbody id="board-body"></tbody></table>
+      <p id="empty-state" class="empty-state hidden">No runs yet - be the first to watch some paint dry.</p>
+      <p id="load-error" class="load-error hidden">Couldn't reach the highscores server right now. Try refreshing in a moment.</p>
+    </div>
+    <button id="load-more-btn" class="load-more-btn hidden">Load more</button>
+  </div>
+
+  <script>
+    var PAGE_SIZE = 20;
+    var offset = 0;
+
+    function escapeHtml(str) {
+      var div = document.createElement('div');
+      div.textContent = str == null ? '' : String(str);
+      return div.innerHTML;
+    }
+
+    function rowHtml(e) {
+      var coverage = e.coveragePercent != null ? (e.coveragePercent + '% coverage') : '';
+      var aways = e.lookAwayCount ? (e.lookAwayCount + 'x looked away') : 'never looked away';
+      return '<tr>'
+        + '<td class="rank">' + e.rank + '</td>'
+        + '<td class="name">' + escapeHtml(e.name)
+          + '<div class="meta">' + escapeHtml(e.colorName) + (coverage ? ' &middot; ' + coverage : '') + ' &middot; ' + escapeHtml(aways) + '</div>'
+        + '</td>'
+        + '<td class="value">' + escapeHtml(e.formattedTime) + '</td>'
+        + '</tr>';
+    }
+
+    async function loadPage() {
+      var boardBody = document.getElementById('board-body');
+      var emptyState = document.getElementById('empty-state');
+      var loadError = document.getElementById('load-error');
+      var loadMoreBtn = document.getElementById('load-more-btn');
+
+      try {
+        var res = await fetch('api/highscores?offset=' + offset + '&limit=' + PAGE_SIZE);
+        if (!res.ok) throw new Error('bad response');
+        var data = await res.json();
+
+        if (offset === 0 && (!data.entries || !data.entries.length)) {
+          emptyState.classList.remove('hidden');
+          loadMoreBtn.classList.add('hidden');
+          return;
+        }
+
+        var html = '';
+        for (var i = 0; i < data.entries.length; i++) html += rowHtml(data.entries[i]);
+        boardBody.insertAdjacentHTML('beforeend', html);
+
+        offset += data.entries.length;
+        if (data.hasMore) {
+          loadMoreBtn.classList.remove('hidden');
+        } else {
+          loadMoreBtn.classList.add('hidden');
+        }
+      } catch (e) {
+        loadError.classList.remove('hidden');
+        loadMoreBtn.classList.add('hidden');
+      }
+    }
+
+    document.getElementById('load-more-btn').addEventListener('click', loadPage);
+    loadPage();
+  </script>
+</body>
+</html>

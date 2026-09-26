@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Watch the Drying</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header id="site-header">
+    <h1 class="dynamic-logo">Watch the Drying</h1>
+    <p class="tagline">Paint a wall. Watch it dry. That's the whole game.</p>
+    <nav class="top-nav">
+      <a href="highscores.html">Highscores</a>
+      <span class="nav-sep">&middot;</span>
+      <a href="/">Andisdad Games home</a>
+    </nav>
+  </header>
+
+  <div id="game-wrap">
+    <div id="game-row">
+      <div id="game-area">
+        <canvas id="wall-canvas" width="900" height="600"></canvas>
+
+        <!-- Shown once painting has started. Coverage ticks up as the
+             player drags the brush over the wall; once it reads 100%,
+             updateCoverageUI() in game.js flood-fills any remaining
+             pinholes and automatically moves into the drying phase - no
+             button to click. -->
+        <div id="paint-hud" class="hud-panel hidden">
+          <div id="coverage-label">Painted: 0%</div>
+          <div class="progress-track"><div id="coverage-bar" class="progress-fill"></div></div>
+          <div class="hud-actions">
+            <button id="reset-wall-btn" class="tiny-link-btn">Wipe it off, start again</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- The drying/score panel - deliberately OUTSIDE the playing
+           area, to the right of the canvas rather than overlapping it.
+           The drying percentage advances regardless of whether anyone's
+           watching - the score ("Moments of calm") is the thing that
+           only counts up while the mouse is actually hovering the
+           painted wall itself - see the WATCHING mechanic in game.js. -->
+      <aside id="drying-hud" class="hud-panel-side hidden">
+        <div id="drying-label">Drying: 0%</div>
+        <div class="progress-track"><div id="drying-bar" class="progress-fill drying-fill"></div></div>
+        <div id="caption-box">Still wet.</div>
+        <div id="away-banner" class="hidden">You looked away. The paint keeps drying regardless - but your "moments of calm" score has paused.</div>
+        <div id="watch-stats"></div>
+      </aside>
+    </div>
+  </div>
+
+  <div id="splash-screen" class="overlay-screen">
+    <div class="overlay-content">
+      <h1 class="dynamic-logo">Watch the Drying</h1>
+      <p class="copyright">A game by Robin Andisdad, copyright 2026 &middot; <a href="/" style="color:#6fc7ff;">Andisdad Games home</a></p>
+      <p class="game-summary">
+        Paint a small section of wall, then watch the paint dry. That's it.
+        That's the whole game. Pick a colour and cover the wall before the
+        round timer runs out for a bonus - once it's fully painted,
+        watching begins automatically. The paint dries at its own pace
+        regardless of whether you watch. Your score is "Moments of calm":
+        one point for every second you actually spend watching it. Look
+        away and the paint doesn't mind, but your calm stops counting.
+      </p>
+
+      <div class="color-picker-block">
+        <p class="color-picker-label">Choose your paint:</p>
+        <div id="color-swatches" class="color-swatches"></div>
+      </div>
+
+      <!-- Player name, asked once (see initPlayerNameUI() in game.js) and
+           reused for every future run - shown on the leaderboard. -->
+      <div id="player-name-entry" class="player-name-block hidden">
+        <label for="player-name-input" class="player-name-label">Enter your name for the highscore board:</label>
+        <div class="player-name-row">
+          <input id="player-name-input" type="text" maxlength="24" placeholder="Your name" autocomplete="off">
+          <button id="player-name-save-btn" class="tiny-action-btn">Save</button>
+        </div>
+      </div>
+      <div id="player-name-display" class="player-name-block hidden">
+        Playing as <strong id="player-name-current"></strong>
+        <button id="player-name-change-btn" class="tiny-link-btn">change</button>
+      </div>
+
+      <button id="start-painting-btn" class="big-action-btn" disabled>Pick a colour first</button>
+    </div>
+  </div>
+
+  <div id="game-over-screen" class="overlay-screen hidden">
+    <div class="overlay-content">
+      <h1 class="dynamic-logo">Watch the Drying</h1>
+      <p class="copyright">A game by Robin Andisdad, copyright 2026 &middot; <a href="/" style="color:#6fc7ff;">Andisdad Games home</a></p>
+      <p class="game-summary">The paint has dried. You did it. Or rather, you watched it happen.</p>
+      <div id="game-over-stats"></div>
+
+      <!-- Populated by fetchHighscores() - hidden entirely if the Pi's
+           server isn't reachable (e.g. local file testing), see game.js. -->
+      <div id="highscore-section" class="hidden">
+        <p class="highscore-title">Most Moments of Calm</p>
+        <ol id="highscore-list"></ol>
+        <a href="/drying/highscores.html" class="tiny-link-btn" style="display:block;margin:10px 0 0;text-align:center;">View full leaderboard &rarr;</a>
+      </div>
+
+      <button id="paint-again-btn" class="big-action-btn" style="margin-top:20px;">Paint Another Wall</button>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
