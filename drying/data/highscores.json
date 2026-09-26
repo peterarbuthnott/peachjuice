@@ -156,6 +156,19 @@
   {
     "playerId": "f038dafe-71ae-421b-814e-cece2c7141fb",
     "name": "new-game",
+    "colorName": "Butter",
+    "coveragePercent": 100,
+    "momentsOfCalm": 64,
+    "paintBonusAwarded": false,
+    "totalElapsedMs": 127319,
+    "watchedMs": 64464,
+    "awayMs": 5549,
+    "lookAwayCount": 4,
+    "submittedAt": "2026-09-26T15:04:58.434Z"
+  },
+  {
+    "playerId": "f038dafe-71ae-421b-814e-cece2c7141fb",
+    "name": "new-game",
     "colorName": "Duck Egg",
     "coveragePercent": 100,
     "momentsOfCalm": 55,
@@ -204,6 +217,19 @@
     "awayMs": 73464,
     "lookAwayCount": 2,
     "submittedAt": "2026-09-25T07:36:22.793Z"
+  },
+  {
+    "playerId": "f038dafe-71ae-421b-814e-cece2c7141fb",
+    "name": "new-game",
+    "colorName": "Cloud White",
+    "coveragePercent": 100,
+    "momentsOfCalm": 10,
+    "paintBonusAwarded": true,
+    "totalElapsedMs": 111982,
+    "watchedMs": 0,
+    "awayMs": 61531,
+    "lookAwayCount": 9,
+    "submittedAt": "2026-09-26T15:30:36.486Z"
   },
   {
     "playerId": "f038dafe-71ae-421b-814e-cece2c7141fb",

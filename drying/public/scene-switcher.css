@@ -1,0 +1,100 @@
+/* Shared PeachJuice display scenes. Original leaves each game's own CSS intact. */
+#pj-scene-switcher{position:fixed;z-index:2147483000;right:14px;bottom:14px;display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid rgba(20,35,60,.22);border-radius:9px;background:rgba(255,255,255,.96);color:#17243b;font:600 12px/1.2 Arial,sans-serif;box-shadow:0 3px 14px rgba(10,25,50,.2)}
+#pj-scene-switcher label{display:block;margin:0;color:inherit;font:inherit;white-space:nowrap}
+#pj-scene-switcher select{width:auto;min-width:118px;margin:0;padding:6px 24px 6px 8px;border:1px solid #a9b9d2;border-radius:6px;background:#fff;color:#17243b;font:600 12px Arial,sans-serif;cursor:pointer}
+html[data-scene="peachjuice"]{--pj-bg:#f7f2e8;--pj-paper:#fffdf8;--pj-ink:#252a27;--pj-muted:#72766e;--pj-line:#e7dfd2;--pj-brand:#173b35;--pj-accent:#e88362;--pj-soft:#d8e6d8}
+html[data-scene="sunny-blue"]{--pj-bg:#e9f0fb;--pj-paper:#fff;--pj-ink:#17243b;--pj-muted:#61708a;--pj-line:#cbd8ed;--pj-brand:#172c55;--pj-accent:#4169e1;--pj-soft:#dcecff;--pj-pop:#ffe36e;--pj-pink:#ff806f}
+/* Shared game chrome */
+html[data-scene="peachjuice"] body,html[data-scene="sunny-blue"] body{background:var(--pj-bg)!important;color:var(--pj-ink)}
+html[data-scene="peachjuice"] #site-header,html[data-scene="sunny-blue"] #site-header,html[data-scene="peachjuice"] .app-header,html[data-scene="sunny-blue"] .app-header{background:var(--pj-brand)!important;color:#fff!important;box-shadow:0 3px 12px rgba(20,35,60,.16)}
+html[data-scene="peachjuice"] #site-header .dynamic-logo,html[data-scene="sunny-blue"] #site-header .dynamic-logo,html[data-scene="peachjuice"] .app-header h1,html[data-scene="sunny-blue"] .app-header h1{color:#fff!important}
+html[data-scene="peachjuice"] a,html[data-scene="sunny-blue"] a{color:var(--pj-accent)}
+html[data-scene="peachjuice"] button,html[data-scene="sunny-blue"] button{border-radius:8px}
+/* PeachJuice hub */
+html[data-scene="peachjuice"] .page-layout,html[data-scene="sunny-blue"] .page-layout{background:var(--pj-bg)!important;color:var(--pj-ink)!important}
+html[data-scene="peachjuice"] .wrap,html[data-scene="sunny-blue"] .wrap{color:var(--pj-ink)!important}
+html[data-scene="peachjuice"] .dynamic-logo,html[data-scene="sunny-blue"] .dynamic-logo{color:var(--pj-brand)!important}
+html[data-scene="peachjuice"] .game-card,html[data-scene="sunny-blue"] .game-card{background:var(--pj-paper)!important;border:1px solid var(--pj-line)!important;border-radius:14px!important;color:var(--pj-ink)!important;box-shadow:0 5px 18px rgba(20,35,60,.12)!important}
+html[data-scene="peachjuice"] .game-card h2,html[data-scene="sunny-blue"] .game-card h2{color:var(--pj-brand)!important}
+html[data-scene="peachjuice"] .big-action-btn,html[data-scene="sunny-blue"] .big-action-btn{background:var(--pj-accent)!important;color:#fff!important;border-radius:8px!important}
+html[data-scene="sunny-blue"] .big-action-btn{background:var(--pj-pop)!important;color:#172c55!important}
+/* Canvas game frames and overlays */
+html[data-scene="peachjuice"] #game-wrap,html[data-scene="sunny-blue"] #game-wrap,html[data-scene="peachjuice"] #game-area,html[data-scene="sunny-blue"] #game-area{background:var(--pj-bg)!important}
+html[data-scene="peachjuice"] .overlay-content,html[data-scene="sunny-blue"] .overlay-content,html[data-scene="peachjuice"] #round-complete-panel,html[data-scene="sunny-blue"] #round-complete-panel{background:var(--pj-paper)!important;color:var(--pj-ink)!important;border:1px solid var(--pj-line);box-shadow:0 10px 35px rgba(20,35,60,.22)!important}
+html[data-scene="peachjuice"] .dynamic-logo,html[data-scene="sunny-blue"] .dynamic-logo{color:var(--pj-brand)!important}
+html[data-scene="peachjuice"] .game-summary,html[data-scene="sunny-blue"] .game-summary,html[data-scene="peachjuice"] .copyright,html[data-scene="sunny-blue"] .copyright{color:var(--pj-muted)!important}
+html[data-scene="peachjuice"] .big-action-btn,html[data-scene="peachjuice"] .secondary-action-btn,html[data-scene="peachjuice"] #next-round-btn,html[data-scene="sunny-blue"] .big-action-btn,html[data-scene="sunny-blue"] .secondary-action-btn,html[data-scene="sunny-blue"] #next-round-btn{background:var(--pj-accent)!important;color:#fff!important;border-color:transparent!important}
+html[data-scene="sunny-blue"] .big-action-btn,html[data-scene="sunny-blue"] #next-round-btn{background:var(--pj-pop)!important;color:#172c55!important}
+/* Drying HUD */
+html[data-scene="peachjuice"] #stats-bar,html[data-scene="sunny-blue"] #stats-bar,html[data-scene="peachjuice"] .hud-panel,html[data-scene="sunny-blue"] .hud-panel,html[data-scene="peachjuice"] .hud-panel-side,html[data-scene="sunny-blue"] .hud-panel-side{background:var(--pj-paper)!important;color:var(--pj-ink)!important;border-color:var(--pj-line)!important}
+html[data-scene="peachjuice"] #calm-heading{color:var(--pj-accent)!important}html[data-scene="sunny-blue"] #calm-heading{color:#ffe36e!important}
+/* Standup quiz */
+html[data-scene="peachjuice"] body,html[data-scene="sunny-blue"] body{--navy:var(--pj-brand);--ice:var(--pj-soft);--white:var(--pj-paper);--ink:var(--pj-ink);--muted:var(--pj-muted);--border:var(--pj-line)}
+html[data-scene="sunny-blue"] .btn-primary{background:#4169e1!important;color:#fff!important}html[data-scene="sunny-blue"] .btn-secondary{background:#ffe36e!important;color:#172c55!important}
+/* Nominate app tokens */
+html[data-scene="peachjuice"] #app,html[data-scene="sunny-blue"] #app{--bg:var(--pj-bg);--card:var(--pj-paper);--card-hover:var(--pj-soft);--gold:var(--pj-accent);--gold-hover:var(--pj-accent);--white:var(--pj-ink);--border-05:rgba(23,44,85,.05);--border-10:rgba(23,44,85,.1);--border-20:rgba(23,44,85,.2);--text-30:rgba(23,44,85,.3);--text-40:rgba(23,44,85,.4);--text-60:rgba(23,44,85,.6);--text-80:rgba(23,44,85,.8);--text-85:rgba(23,44,85,.85);--text-90:rgba(23,44,85,.9);--zinc-100:#f4f4f5;--zinc-200:#e4e4e7;--zinc-300:#d4d4d8;--zinc-400:#72766e;--zinc-800:#e7dfd2;--zinc-900:#f7f2e8;--zinc-950:#fffdf8;box-shadow:0 0 0 1px var(--pj-line),0 12px 38px rgba(20,35,60,.14)!important}
+html[data-scene="sunny-blue"] #app{--bg:#e9f0fb;--card:#fff;--card-hover:#dcecff;--gold:#ffe36e;--gold-hover:#f0d34f;--white:#17243b;--emerald:#287657;--rose:#b23f4a;--cyan:#4169e1;--zinc-400:#61708a;--zinc-800:#cbd8ed;--zinc-900:#e9f0fb;--zinc-950:#fff}
+html[data-scene="peachjuice"] body,html[data-scene="sunny-blue"] body{background:var(--pj-bg)!important}
+
+/* Semantic shared scene tokens: text and surfaces remain readable on every screen. */
+html[data-scene="peachjuice"]{--scene-page-bg:#f7f2e8;--scene-surface:#fffdf8;--scene-text:#252a27;--scene-muted:#50594f;--scene-border:#c9c1b5;--scene-brand:#173b35;--scene-action:#963f24;--scene-action-text:#ffffff;--scene-highlight:#f6dfd2;--scene-highlight-text:#30251e;--scene-link:#77351f}
+html[data-scene="sunny-blue"]{--scene-page-bg:#e9f0fb;--scene-surface:#ffffff;--scene-text:#17243b;--scene-muted:#4d5b70;--scene-border:#b6c5da;--scene-brand:#172c55;--scene-action:#254eb8;--scene-action-text:#ffffff;--scene-highlight:#ffe36e;--scene-highlight-text:#17243b;--scene-link:#2449a6}
+html[data-scene="peachjuice"] body,html[data-scene="sunny-blue"] body{background:var(--scene-page-bg)!important;color:var(--scene-text)!important}
+html[data-scene="peachjuice"] p,html[data-scene="sunny-blue"] p,html[data-scene="peachjuice"] small,html[data-scene="sunny-blue"] small,html[data-scene="peachjuice"] .subtitle,html[data-scene="sunny-blue"] .subtitle,html[data-scene="peachjuice"] .tagline,html[data-scene="sunny-blue"] .tagline,html[data-scene="peachjuice"] .meta,html[data-scene="sunny-blue"] .meta{color:var(--scene-muted)!important}
+html[data-scene="peachjuice"] h1,html[data-scene="sunny-blue"] h1,html[data-scene="peachjuice"] h2,html[data-scene="sunny-blue"] h2,html[data-scene="peachjuice"] h3,html[data-scene="sunny-blue"] h3,html[data-scene="peachjuice"] .dynamic-logo,html[data-scene="sunny-blue"] .dynamic-logo{color:var(--scene-brand)!important;-webkit-text-fill-color:var(--scene-brand)!important;background:none!important}
+html[data-scene="peachjuice"] a,html[data-scene="sunny-blue"] a{color:var(--scene-link)!important}
+html[data-scene="peachjuice"] input,html[data-scene="sunny-blue"] input,html[data-scene="peachjuice"] select:not(#pj-scene-select),html[data-scene="sunny-blue"] select:not(#pj-scene-select),html[data-scene="peachjuice"] textarea,html[data-scene="sunny-blue"] textarea{background:var(--scene-surface)!important;color:var(--scene-text)!important;border-color:var(--scene-border)!important}
+html[data-scene="peachjuice"] .screen,html[data-scene="sunny-blue"] .screen,html[data-scene="peachjuice"] .board,html[data-scene="sunny-blue"] .board,html[data-scene="peachjuice"] .game-card,html[data-scene="sunny-blue"] .game-card,html[data-scene="peachjuice"] .overlay-content,html[data-scene="sunny-blue"] .overlay-content,html[data-scene="peachjuice"] #round-complete-panel,html[data-scene="sunny-blue"] #round-complete-panel,html[data-scene="peachjuice"] #stats-bar,html[data-scene="sunny-blue"] #stats-bar,html[data-scene="peachjuice"] .hud-panel,html[data-scene="sunny-blue"] .hud-panel,html[data-scene="peachjuice"] .hud-panel-side,html[data-scene="sunny-blue"] .hud-panel-side,html[data-scene="peachjuice"] .panel,html[data-scene="sunny-blue"] .panel{background:var(--scene-surface)!important;color:var(--scene-text)!important;border-color:var(--scene-border)!important;box-shadow:0 5px 20px rgba(20,35,60,.12)}
+/* Drying leaderboard is an inline-styled page; these semantic rules intentionally cover its exact row parts. */
+html[data-scene="peachjuice"] .board td,html[data-scene="sunny-blue"] .board td{color:var(--scene-text)!important;border-bottom-color:var(--scene-border)!important}
+html[data-scene="peachjuice"] .board .rank,html[data-scene="sunny-blue"] .board .rank{color:var(--scene-brand)!important}
+html[data-scene="peachjuice"] .board .name,html[data-scene="sunny-blue"] .board .name{color:var(--scene-text)!important}
+html[data-scene="peachjuice"] .board .meta,html[data-scene="sunny-blue"] .board .meta,html[data-scene="peachjuice"] .empty-state,html[data-scene="sunny-blue"] .empty-state,html[data-scene="peachjuice"] .load-error,html[data-scene="sunny-blue"] .load-error{color:var(--scene-muted)!important}
+html[data-scene="peachjuice"] .board .value,html[data-scene="sunny-blue"] .board .value{color:var(--scene-brand)!important}
+html[data-scene="peachjuice"] .load-more-btn,html[data-scene="sunny-blue"] .load-more-btn,html[data-scene="peachjuice"] .big-action-btn,html[data-scene="sunny-blue"] .big-action-btn,html[data-scene="peachjuice"] .secondary-action-btn,html[data-scene="sunny-blue"] .secondary-action-btn,html[data-scene="peachjuice"] #next-round-btn,html[data-scene="sunny-blue"] #next-round-btn,html[data-scene="peachjuice"] .btn-primary,html[data-scene="sunny-blue"] .btn-primary,html[data-scene="peachjuice"] .btn-gold,html[data-scene="sunny-blue"] .btn-gold,html[data-scene="peachjuice"] .btn-cyan,html[data-scene="sunny-blue"] .btn-cyan{background:var(--scene-action)!important;color:var(--scene-action-text)!important;border:1px solid var(--scene-action)!important}
+html[data-scene="peachjuice"] .btn-secondary,html[data-scene="sunny-blue"] .btn-secondary{background:var(--scene-highlight)!important;color:var(--scene-highlight-text)!important;border:1px solid var(--scene-border)!important}
+html[data-scene="peachjuice"] #calm-heading{color:var(--scene-brand)!important}html[data-scene="sunny-blue"] #calm-heading{color:var(--scene-brand)!important}
+/* Shared hub cards and the nominee/score app token bridge. */
+html[data-scene="peachjuice"] .game-card,html[data-scene="sunny-blue"] .game-card{background:var(--scene-surface)!important;color:var(--scene-text)!important;border-color:var(--scene-border)!important}
+html[data-scene="peachjuice"] #app,html[data-scene="sunny-blue"] #app{--bg:var(--scene-page-bg);--card:var(--scene-surface);--card-hover:var(--scene-highlight);--gold:var(--scene-brand);--gold-hover:var(--scene-action);--white:var(--scene-text);--border-05:rgba(23,44,85,.08);--border-10:rgba(23,44,85,.14);--border-20:rgba(23,44,85,.28);--text-30:#586477;--text-40:#4d5b70;--text-60:#3f4f66;--text-80:#2e3d54;--text-85:#27364d;--text-90:#17243b;--zinc-400:#4d5b70;--zinc-800:#cbd8ed;--zinc-900:var(--scene-page-bg);--zinc-950:var(--scene-surface);box-shadow:0 0 0 1px var(--scene-border),0 12px 38px rgba(20,35,60,.14)!important}
+
+/* Header content sits on the dark brand bar, so use high-contrast light text there. */
+html[data-scene="peachjuice"] #site-header p,html[data-scene="sunny-blue"] #site-header p,html[data-scene="peachjuice"] #site-header small,html[data-scene="sunny-blue"] #site-header small,html[data-scene="peachjuice"] .app-header p,html[data-scene="sunny-blue"] .app-header p,html[data-scene="peachjuice"] .app-header .subtitle,html[data-scene="sunny-blue"] .app-header .subtitle{color:#edf4ff!important}
+html[data-scene="peachjuice"] #site-header a,html[data-scene="sunny-blue"] #site-header a,html[data-scene="peachjuice"] .app-header a,html[data-scene="sunny-blue"] .app-header a{color:#ffe36e!important}
+html[data-scene="peachjuice"] #site-header .nav-sep,html[data-scene="sunny-blue"] #site-header .nav-sep{color:#dce6f5!important}
+
+/* Drying: keep the page, start overlay, and game surround on one continuous surface. */
+html[data-scene="peachjuice"],html[data-scene="sunny-blue"]{--scene-page-bg:var(--scene-surface);--scene-action-shadow:rgba(23,44,85,.28)}
+html[data-scene="peachjuice"]{--scene-action-shadow:rgba(150,63,36,.32)}html[data-scene="sunny-blue"]{--scene-action-shadow:rgba(37,78,184,.32)}
+html[data-scene="peachjuice"] #game-wrap,html[data-scene="sunny-blue"] #game-wrap,html[data-scene="peachjuice"] #game-row,html[data-scene="sunny-blue"] #game-row,html[data-scene="peachjuice"] #game-area,html[data-scene="sunny-blue"] #game-area,html[data-scene="peachjuice"] .overlay-screen,html[data-scene="sunny-blue"] .overlay-screen{background:var(--scene-surface)!important}
+html[data-scene="peachjuice"] .overlay-content,html[data-scene="sunny-blue"] .overlay-content{background:var(--scene-surface)!important;color:var(--scene-text)!important}
+html[data-scene="peachjuice"] .player-name-block,html[data-scene="sunny-blue"] .player-name-block,html[data-scene="peachjuice"] .player-name-label,html[data-scene="sunny-blue"] .player-name-label{color:var(--scene-text)!important}
+html[data-scene="peachjuice"] #player-name-display strong,html[data-scene="sunny-blue"] #player-name-display strong{color:var(--scene-brand)!important}
+html[data-scene="peachjuice"] .player-name-block .tiny-link-btn,html[data-scene="sunny-blue"] .player-name-block .tiny-link-btn{color:var(--scene-link)!important}
+html[data-scene="peachjuice"] .big-action-btn,html[data-scene="sunny-blue"] .big-action-btn{box-shadow:0 7px 18px var(--scene-action-shadow)!important}
+html[data-scene="peachjuice"] .big-action-btn:disabled,html[data-scene="sunny-blue"] .big-action-btn:disabled{background:#667085!important;color:#fff!important;box-shadow:none!important;opacity:1}
+
+/* Drying HUD labels and the persistent page title need their own semantic foregrounds. */
+html[data-scene="peachjuice"] #site-header .dynamic-logo,html[data-scene="sunny-blue"] #site-header .dynamic-logo{color:#ffffff!important;-webkit-text-fill-color:#ffffff!important;background:none!important;text-shadow:none!important}
+html[data-scene="peachjuice"] #coverage-label,html[data-scene="sunny-blue"] #coverage-label,html[data-scene="peachjuice"] #drying-label,html[data-scene="sunny-blue"] #drying-label{color:var(--scene-brand)!important}
+html[data-scene="peachjuice"] #caption-box,html[data-scene="sunny-blue"] #caption-box,html[data-scene="peachjuice"] #away-stat,html[data-scene="sunny-blue"] #away-stat{color:var(--scene-muted)!important}
+html[data-scene="peachjuice"] #away-banner,html[data-scene="sunny-blue"] #away-banner{color:#7b2e22!important;background:#fff1ec!important;border-color:#d9aa9e!important}
+
+/* Drying end-screen statistics and leaderboard use foregrounds for a light card. */
+html[data-scene="peachjuice"] #game-over-stats,html[data-scene="sunny-blue"] #game-over-stats,html[data-scene="peachjuice"] #game-over-stats p,html[data-scene="sunny-blue"] #game-over-stats p,html[data-scene="peachjuice"] #highscore-list,html[data-scene="sunny-blue"] #highscore-list{color:var(--scene-text)!important}
+html[data-scene="peachjuice"] #game-over-stats .score-line,html[data-scene="sunny-blue"] #game-over-stats .score-line,html[data-scene="peachjuice"] .highscore-title,html[data-scene="sunny-blue"] .highscore-title{color:var(--scene-brand)!important}
+html[data-scene="peachjuice"] #game-over-stats .bonus-tag,html[data-scene="sunny-blue"] #game-over-stats .bonus-tag{color:#286348!important}
+html[data-scene="peachjuice"] #highscore-section,html[data-scene="sunny-blue"] #highscore-section{border-top-color:var(--scene-border)!important}
+html[data-scene="peachjuice"] #highscore-list li strong,html[data-scene="sunny-blue"] #highscore-list li strong{color:var(--scene-link)!important}
+
+/* Bring back the animated title treatment with palette-matched, contrast-safe stops. */
+html[data-scene="peachjuice"]{--scene-title-on-dark:linear-gradient(90deg,#ffe36e,#ffc0a8,#c4e5ca,#ffe36e);--scene-title-on-light:linear-gradient(90deg,#173b35,#984326,#356b4d,#173b35)}
+html[data-scene="sunny-blue"]{--scene-title-on-dark:linear-gradient(90deg,#ffe36e,#b9d9ff,#ffb5a6,#ffe36e);--scene-title-on-light:linear-gradient(90deg,#172c55,#2449a6,#a53f45,#172c55)}
+html[data-scene="peachjuice"] .overlay-content .dynamic-logo,html[data-scene="sunny-blue"] .overlay-content .dynamic-logo,html[data-scene="peachjuice"] .wrap h1.dynamic-logo,html[data-scene="sunny-blue"] .wrap h1.dynamic-logo{background:var(--scene-title-on-light) 0% 50% / 300% 100% no-repeat!important;background-size:300% 100%!important;background-clip:text!important;-webkit-background-clip:text!important;color:transparent!important;-webkit-text-fill-color:transparent!important;text-shadow:none!important;animation:pj-scene-title-shimmer 5s ease-in-out infinite}
+html[data-scene="peachjuice"] #site-header .dynamic-logo,html[data-scene="sunny-blue"] #site-header .dynamic-logo{background:var(--scene-title-on-dark) 0% 50% / 300% 100% no-repeat!important;background-size:300% 100%!important;background-clip:text!important;-webkit-background-clip:text!important;color:transparent!important;-webkit-text-fill-color:transparent!important;text-shadow:none!important;animation:pj-scene-title-shimmer 5s ease-in-out infinite}
+
+@keyframes pj-scene-title-shimmer{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+
+/* Match the player-name Save action to the primary Start Painting action. */
+html[data-scene="peachjuice"] .tiny-action-btn,html[data-scene="sunny-blue"] .tiny-action-btn{background:var(--scene-action)!important;color:var(--scene-action-text)!important;border:1px solid var(--scene-action)!important;box-shadow:0 7px 18px var(--scene-action-shadow)!important}
+html[data-scene="peachjuice"] .tiny-action-btn:hover,html[data-scene="sunny-blue"] .tiny-action-btn:hover{background:var(--scene-action)!important;color:var(--scene-action-text)!important}
