@@ -222,22 +222,19 @@
           <p id="round-complete-earned"></p>
           <p id="round-complete-bonus"></p>
 
-          <!-- Inline "postbox" banner ad - stats show first, then this,
-               then the Next Round button stays the clear final action.
-               Left empty here on purpose - window.__pushRoundCompleteAd()
-               (see the ADSENSE block in <head>) builds a fresh <ins> into
-               this container every time the panel is revealed, rather than
-               a static one being reused/re-pushed across rounds. -->
-          <div id="round-complete-ad" class="medium-rectangle-ad">
-            <!-- dullas-roundend -->
-          </div>
-
           <button id="next-round-btn">Next Round &rarr;</button>
+          <button id="finish-run-btn" class="secondary-action-btn hidden">I've done enough</button>
           <!-- Progress is already saved by this point (onRoundComplete() calls
                saveSnapshot() before this panel shows) - so leaving here is
                always safe, and the splash screen's "Continue" button picks
                the run back up exactly where it left off. -->
           <a href="/" class="tiny-link-btn round-complete-exit-link">Exit to Home (progress is saved)</a>
+          <!-- Inline "postbox" banner ad - see index.html's ADSENSE block.
+               Keep it after the round actions so the stats and controls stay
+               first and remain easy to reach on short screens. -->
+          <div id="round-complete-ad" class="medium-rectangle-ad">
+            <!-- dullas-roundend -->
+          </div>
         </div>
       </div>
     </div>

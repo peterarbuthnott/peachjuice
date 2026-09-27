@@ -59,6 +59,7 @@ var https = require('https');
 var fs = require('fs');
 var path = require('path');
 var urlModule = require('url');
+var zlib = require('zlib');
 
 var PORT = process.env.PORT || 3000;
 var ROOT_DIR = __dirname;
@@ -90,7 +91,7 @@ try {
 // own directory, independent of this file's ROOT_DIR/DATA_DIR. Adjust
 // NOMINATE_SERVER_PATH below if the nominate-app folder doesn't live as a
 // sibling of this dullas folder.
-var NOMINATE_SERVER_PATH = path.join(ROOT_DIR, '..', 'nominate-app', 'server.js');
+var NOMINATE_SERVER_PATH = path.join(ROOT_DIR, '..', 'nominate', 'server.js');
 var nominateHandler = null;
 try {
   nominateHandler = require(NOMINATE_SERVER_PATH).createHandler('/nominate');
@@ -340,7 +341,7 @@ function handleGetHighscores(req, res) {
 }
 
 // ----------------------------------------------------------------------------
-// /api/leaderboards - the highscores page's 2-category x 4-metric boards.
+// /api/leaderboards - the highscores page's 3-category x 4-metric boards.
 // These exact strings are game.js's showGameOverScreen() reason text for
 // its two win conditions (round MAX_ROUNDS finished vs every upgrade
 // maxed) - if MAX_ROUNDS ever changes there, this constant needs updating
@@ -348,6 +349,7 @@ function handleGetHighscores(req, res) {
 // ----------------------------------------------------------------------------
 var REASON_ROUND_COMPLETE = 'You completed all 35 rounds!';
 var REASON_UPGRADE_COMPLETE = 'You maxed out every upgrade!';
+var REASON_PLAYER_FINISH_PREFIX = 'You chose to finish after round ';
 var LEADERBOARD_LIMIT = 10;
 
 // Keeps, per playerId, whichever entry is best according to metricFn -
@@ -419,16 +421,20 @@ function handleGetLeaderboards(req, res) {
   var all = readLines(HIGHSCORES_FILE);
   var roundEntries = [];
   var upgradeEntries = [];
+  var playerFinishEntries = [];
   for (var i = 0; i < all.length; i++) {
     if (all[i].reason === REASON_ROUND_COMPLETE) {
       roundEntries.push(all[i]);
     } else if (all[i].reason === REASON_UPGRADE_COMPLETE) {
       upgradeEntries.push(all[i]);
+    } else if (typeof all[i].reason === 'string' && all[i].reason.indexOf(REASON_PLAYER_FINISH_PREFIX) === 0) {
+      playerFinishEntries.push(all[i]);
     }
   }
   sendJson(res, 200, {
     roundCompletion: buildCategoryLeaderboards(roundEntries),
     upgradeCompletion: buildCategoryLeaderboards(upgradeEntries),
+    playerFinish: buildCategoryLeaderboards(playerFinishEntries),
   });
 }
 

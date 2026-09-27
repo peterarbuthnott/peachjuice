@@ -43,6 +43,7 @@ const roundCompleteCleaned = document.getElementById('round-complete-cleaned');
 const roundCompleteEarned = document.getElementById('round-complete-earned');
 const roundCompleteBonus = document.getElementById('round-complete-bonus');
 const nextRoundBtn = document.getElementById('next-round-btn');
+const finishRunBtn = document.getElementById('finish-run-btn');
 
 const splashScreen = document.getElementById('splash-screen');
 const startWashingBtn = document.getElementById('start-washing-btn');
@@ -336,6 +337,7 @@ function ensureStackSpace() {
       state.stacks.shift(); // clear the lowest (oldest) stack - it's gone, not just hidden
     }
     state.stacks.push([]);
+    stacksLayerDirty = true;
     const bonus = STACK_FILL_BONUS_PLATES * NORMAL_REWARD * state.rewardMultiplier;
     state.platesCleaned += bonus;
     state.roundCurrencyEarned += bonus;
@@ -915,6 +917,8 @@ function applySnapshotToState(snapshot) {
   state.scrubEfficiency = snapshot.scrubEfficiency;
   state.rewardMultiplier = snapshot.rewardMultiplier;
   state.stacks = snapshot.stacks && snapshot.stacks.length ? snapshot.stacks.map((s) => [...s]) : [[]];
+  stacksLayerDirty = true;
+  invalidateUpgradeTextCache();
 }
 
 // ============================================================================
@@ -1110,6 +1114,18 @@ const state = {
 };
 
 // ----------------------------------------------------------------------------
+// Offscreen layers for content that changes only at explicit game events.
+let backgroundLayerCanvas = null;
+let stackPileLayerCanvas = null;
+let stackPileLayerDirty = true;
+let stacksLayerCanvas = null;
+let stacksLayerDirty = true;
+const upgradeTextCache = [];
+function invalidateUpgradeTextCache(index) {
+  if (index == null) upgradeTextCache.length = 0;
+  else upgradeTextCache[index] = null;
+}
+
 // Upgrades: each entry is purchasable with plates (the currency). Cost
 // multiplies by def.costMultiplier (default 2x, i.e. doubling) every time
 // that same upgrade is bought again. An entry with isMaxed() shows FULL and
@@ -1248,6 +1264,7 @@ function buyUpgrade(def, index) {
   state.totalPlatesSpent += cost;
   state.upgrades[def.id] = (state.upgrades[def.id] || 0) + 1;
   def.apply();
+  invalidateUpgradeTextCache(index);
 
   logEvent({
     type: 'upgrade_purchase',
@@ -1337,6 +1354,8 @@ function spawnActivePlate() {
 
 function startRound(roundNum) {
   state.round = roundNum;
+  stackPileLayerDirty = true;
+  invalidateUpgradeTextCache();
   const total = platesForRound(roundNum);
   state.roundTotalPlates = total;
   state.roundStartTime = performance.now();
@@ -1344,6 +1363,7 @@ function startRound(roundNum) {
   state.roundCurrencyEarned = 0;
   state.stackRemaining = total - 1;
   state.stackOffsets = generateStackOffsets(state.stackRemaining);
+  stackPileLayerDirty = true;
   // Note: state.stacks is intentionally NOT reset here - stacks keep filling
   // up across rounds; see ensureStackSpace() for how the oldest one clears.
   state.animatingPlate = null;
@@ -1419,6 +1439,7 @@ function onRoundComplete() {
   roundCompleteBonus.textContent = bonusEarned
     ? `⏱ Finished in ${formatDuration(elapsed)} - Speed bonus: +${bonusAmount} plates! (target: ${formatMinSec(timeLimitMs)})`
     : `⏱ Finished in ${formatDuration(elapsed)} - too slow for the speed bonus (target: ${formatMinSec(timeLimitMs)})`;
+  finishRunBtn.classList.toggle('hidden', state.round < 10);
   roundCompletePanel.classList.remove('hidden');
   // window.__pushRoundCompleteAd() (see index.html's ADSENSE block) only
   // actually does anything the very first time this fires - it pushes the
@@ -1494,6 +1515,11 @@ nextRoundBtn.addEventListener('click', () => {
   startRound(state.round + 1);
 });
 
+finishRunBtn.addEventListener('click', () => {
+  if (state.gameOver || !state.roundComplete || state.round < 10) return;
+  showGameOverScreen('You chose to finish after round ' + state.round + '.');
+});
+
 // Kicks off the fly-to-stack animation for a just-cleaned plate. The plate
 // object is reused (repositioned each frame) purely for drawing; once the
 // animation finishes it's discarded and a fresh dirty plate takes over. The
@@ -1540,6 +1566,7 @@ function updatePlateAnimation() {
     state.roundCurrencyEarned += reward;
     state.washTimestamps.push(performance.now());
     state.stacks[anim.targetStackIndex].push(anim.plate.isGolden);
+    stacksLayerDirty = true;
 
     // One of the two win conditions (the other is finishing MAX_ROUNDS,
     // checked in onRoundComplete()) is maxing out every upgrade. Checked
@@ -1554,6 +1581,7 @@ function updatePlateAnimation() {
     if (state.stackRemaining > 0) {
       state.stackRemaining -= 1;
       state.stackOffsets.shift();
+      stackPileLayerDirty = true;
       state.activePlate = spawnActivePlate();
     } else {
       onRoundComplete();
@@ -1705,37 +1733,53 @@ function drawBubbles() {
 // Rendering
 // ----------------------------------------------------------------------------
 function drawBackground() {
-  ctx.fillStyle = '#6e5947';
-  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-  // subtle counter wood grain lines
-  ctx.strokeStyle = 'rgba(0,0,0,0.06)';
-  ctx.lineWidth = 1;
-  for (let y = HUD_HEIGHT; y < CANVAS_H; y += 14) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(CANVAS_W, y);
-    ctx.stroke();
+  if (!backgroundLayerCanvas) {
+    backgroundLayerCanvas = document.createElement('canvas');
+    backgroundLayerCanvas.width = CANVAS_W;
+    backgroundLayerCanvas.height = CANVAS_H;
+    const backgroundCtx = backgroundLayerCanvas.getContext('2d');
+    backgroundCtx.fillStyle = '#6e5947';
+    backgroundCtx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    // This counter and its wood grain never change, so paint them once.
+    backgroundCtx.strokeStyle = 'rgba(0,0,0,0.06)';
+    backgroundCtx.lineWidth = 1;
+    for (let y = HUD_HEIGHT; y < CANVAS_H; y += 14) {
+      backgroundCtx.beginPath();
+      backgroundCtx.moveTo(0, y);
+      backgroundCtx.lineTo(CANVAS_W, y);
+      backgroundCtx.stroke();
+    }
   }
+  ctx.drawImage(backgroundLayerCanvas, 0, 0);
 }
 
 // Dirty plates waiting underneath the active one. Every plate in the pile
 // is rendered (see STACK_MAX_OFFSET for why the pile never runs off the
 // active plate's circle or off-screen even for huge piles).
 function drawStackPile() {
-  const layers = state.stackRemaining;
-  for (let depth = layers; depth >= 1; depth--) {
-    const off = state.stackOffsets[depth - 1];
-    if (!off) continue;
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(ACTIVE_X + off.x, ACTIVE_Y + off.y, PLATE_RADIUS, 0, Math.PI * 2);
-    ctx.fillStyle = '#d9d2c3';
-    ctx.fill();
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#b8ae98';
-    ctx.stroke();
-    ctx.restore();
+  if (state.stackRemaining <= 0) return;
+  if (!stackPileLayerCanvas || stackPileLayerDirty) {
+    const extent = Math.ceil((PLATE_RADIUS + STACK_MAX_OFFSET) * 2 + 4);
+    const center = extent / 2;
+    stackPileLayerCanvas = document.createElement('canvas');
+    stackPileLayerCanvas.width = extent;
+    stackPileLayerCanvas.height = extent;
+    const pileCtx = stackPileLayerCanvas.getContext('2d');
+    for (let depth = state.stackRemaining; depth >= 1; depth--) {
+      const off = state.stackOffsets[depth - 1];
+      if (!off) continue;
+      pileCtx.beginPath();
+      pileCtx.arc(center + off.x, center + off.y, PLATE_RADIUS, 0, Math.PI * 2);
+      pileCtx.fillStyle = '#d9d2c3';
+      pileCtx.fill();
+      pileCtx.lineWidth = 3;
+      pileCtx.strokeStyle = '#b8ae98';
+      pileCtx.stroke();
+    }
+    stackPileLayerDirty = false;
   }
+  const extent = stackPileLayerCanvas.width;
+  ctx.drawImage(stackPileLayerCanvas, ACTIVE_X - extent / 2, ACTIVE_Y - extent / 2);
 }
 
 // Progress bar shown just under the active plate, tracking its cleanliness.
@@ -1775,39 +1819,63 @@ function drawCleanlinessBar(percent) {
 // capped at STACK_SLOT_COUNT entries (see ensureStackSpace()), so every
 // stack currently in state.stacks is visible - nothing to skip here.
 function drawStacks() {
-  ctx.save();
-  ctx.fillStyle = 'rgba(0,0,0,0.2)';
-  ctx.fillRect(STACK_CONTAINER.x, STACK_CONTAINER.y, STACK_CONTAINER.w, STACK_CONTAINER.h);
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-  ctx.strokeRect(STACK_CONTAINER.x, STACK_CONTAINER.y, STACK_CONTAINER.w, STACK_CONTAINER.h);
-
-  ctx.fillStyle = '#e8f4ff';
-  ctx.font = 'bold 13px Segoe UI, Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('Stacks', STACK_CONTAINER.x + STACK_CONTAINER.w / 2, STACK_CONTAINER.y + 16);
-  ctx.textAlign = 'left';
-  ctx.restore();
-
-  // The array only ever holds up to STACK_SLOT_COUNT stacks (see
-  // ensureStackSpace()), so a stack's index is directly its visible slot.
-  state.stacks.forEach((stack, stackIndex) => {
-    stack.forEach((isGolden, i) => {
-      const pos = stackPlatePosition(stackIndex, i);
-      ctx.beginPath();
-      ctx.ellipse(pos.x, pos.y, 17, 10, 0, 0, Math.PI * 2);
-      ctx.fillStyle = isGolden ? '#ffd54f' : '#ffffff';
-      ctx.fill();
-      ctx.strokeStyle = isGolden ? '#b8860b' : '#cfd8dc';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
+  const borderPadding = 1;
+  if (!stacksLayerCanvas || stacksLayerDirty) {
+    stacksLayerCanvas = document.createElement('canvas');
+    stacksLayerCanvas.width = STACK_CONTAINER.w + borderPadding * 2;
+    stacksLayerCanvas.height = STACK_CONTAINER.h + borderPadding * 2;
+    const stacksCtx = stacksLayerCanvas.getContext('2d');
+    stacksCtx.fillStyle = 'rgba(0,0,0,0.2)';
+    stacksCtx.fillRect(borderPadding, borderPadding, STACK_CONTAINER.w, STACK_CONTAINER.h);
+    stacksCtx.strokeStyle = 'rgba(255,255,255,0.15)';
+    stacksCtx.strokeRect(borderPadding, borderPadding, STACK_CONTAINER.w, STACK_CONTAINER.h);
+    stacksCtx.fillStyle = '#e8f4ff';
+    stacksCtx.font = 'bold 13px Segoe UI, Arial, sans-serif';
+    stacksCtx.textAlign = 'center';
+    stacksCtx.fillText('Stacks', STACK_CONTAINER.w / 2 + borderPadding, 16 + borderPadding);
+    state.stacks.forEach((stack, stackIndex) => {
+      stack.forEach((isGolden, i) => {
+        const pos = stackPlatePosition(stackIndex, i);
+        const x = pos.x - STACK_CONTAINER.x + borderPadding;
+        const y = pos.y - STACK_CONTAINER.y + borderPadding;
+        stacksCtx.beginPath();
+        stacksCtx.ellipse(x, y, 17, 10, 0, 0, Math.PI * 2);
+        stacksCtx.fillStyle = isGolden ? '#ffd54f' : '#ffffff';
+        stacksCtx.fill();
+        stacksCtx.strokeStyle = isGolden ? '#b8860b' : '#cfd8dc';
+        stacksCtx.lineWidth = 1.5;
+        stacksCtx.stroke();
+      });
     });
-  });
+    stacksLayerDirty = false;
+  }
+  ctx.drawImage(stacksLayerCanvas, STACK_CONTAINER.x - borderPadding, STACK_CONTAINER.y - borderPadding);
 }
 
 // Upgrades box on the left, mirroring drawStacks()'s container on the
 // right. Each card shows name / level / current value plus a "Buy" button;
 // buttons are clicked (see the canvas 'click' listener above) to purchase -
 // see drawUpgradeButton().
+function getUpgradeTextLayout(def, index, item) {
+  const level = state.upgrades[def.id] || 0;
+  const width = item.w - 16;
+  const cached = upgradeTextCache[index];
+  if (cached && cached.level === level && cached.round === state.round && cached.width === width) return cached;
+
+  const maxLevelLabel = def.maxLevel != null ? def.maxLevel : '∞';
+  const levelText = `Lv. ${level} / ${maxLevelLabel}`;
+  const currentText = `Current: ${def.currentValueLabel()}`;
+  fittedFontSize(def.name, width, 14, 9, true);
+  const nameFont = ctx.font;
+  fittedFontSize(levelText, width, 12, 8, false);
+  const levelFont = ctx.font;
+  fittedFontSize(currentText, width, 12, 8, false);
+  const currentFont = ctx.font;
+  const layout = { level, round: state.round, width, nameText: def.name, nameFont, levelText, levelFont, currentText, currentFont, buttonFonts: Object.create(null) };
+  upgradeTextCache[index] = layout;
+  return layout;
+}
+
 function drawUpgradesPanel() {
   ctx.save();
   ctx.fillStyle = 'rgba(0,0,0,0.2)';
@@ -1833,6 +1901,7 @@ function drawUpgradesPanel() {
     const item = upgradeItemRect(index);
     const unlocked = isUpgradeUnlocked(index);
     const level = state.upgrades[def.id] || 0;
+    const textLayout = getUpgradeTextLayout(def, index, item);
     const cost = upgradeCost(def);
     const maxed = def.isMaxed ? def.isMaxed() : false;
     const affordable = unlocked && !maxed && state.platesCleaned >= cost;
@@ -1851,24 +1920,17 @@ function drawUpgradesPanel() {
     ctx.stroke();
 
     const textX = item.x + 8;
-    const textMaxWidth = item.w - 16;
-
     ctx.globalAlpha = unlocked ? 1 : 0.5;
     ctx.textAlign = 'left';
-
-    fittedFontSize(def.name, textMaxWidth, 14, 9, true);
+    ctx.font = textLayout.nameFont;
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(def.name, textX, item.y + 17);
-
-    const levelText = `Lv. ${level} / ${maxLevelLabel}`;
-    fittedFontSize(levelText, textMaxWidth, 12, 8, false);
+    ctx.fillText(textLayout.nameText, textX, item.y + 17);
+    ctx.font = textLayout.levelFont;
     ctx.fillStyle = '#9fd8b8';
-    ctx.fillText(levelText, textX, item.y + 35);
-
-    const currentText = `Current: ${def.currentValueLabel()}`;
-    fittedFontSize(currentText, textMaxWidth, 12, 8, false);
+    ctx.fillText(textLayout.levelText, textX, item.y + 35);
+    ctx.font = textLayout.currentFont;
     ctx.fillStyle = '#cfe0d8';
-    ctx.fillText(currentText, textX, item.y + 53);
+    ctx.fillText(textLayout.currentText, textX, item.y + 53);
     ctx.globalAlpha = 1;
     ctx.restore();
 
@@ -1953,7 +2015,14 @@ function drawUpgradeButton(def, index, rect, label, kind, hovered = false) {
   ctx.fillStyle = bg;
   roundRect(ctx, rect.x, rect.y, rect.w, rect.h, 5);
   ctx.fill();
-  fittedFontSize(label, rect.w - 10, 11, 7, true);
+  const textLayout = upgradeTextCache[index] || getUpgradeTextLayout(def, index, upgradeItemRect(index));
+  let buttonFont = textLayout.buttonFonts[label];
+  if (!buttonFont) {
+    fittedFontSize(label, rect.w - 10, 11, 7, true);
+    buttonFont = ctx.font;
+    textLayout.buttonFonts[label] = buttonFont;
+  }
+  ctx.font = buttonFont;
   ctx.fillStyle = fg;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
