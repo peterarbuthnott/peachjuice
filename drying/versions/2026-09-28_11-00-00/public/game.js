@@ -163,19 +163,19 @@ function totalEyeMultiplier() {
   return total;
 }
 
-// At six pairs, arrange them in the requested three-row triangle:
-// one at the top, two in the middle, and three along the base.
-const SIX_EYE_TRIANGLE = [
-  { x: 0, y: -48 },
-  { x: -48, y: 0 },
-  { x: 48, y: 0 },
-  { x: -96, y: 48 },
-  { x: 0, y: 48 },
-  { x: 96, y: 48 },
+// Clockwise regular hexagon around the pointer. At the full six-pair
+// upgrade, each pair is centered on one of these six vertices.
+const SIX_EYE_HEXAGON = [
+  { x: 0, y: -58 },
+  { x: 50.23, y: -29 },
+  { x: 50.23, y: 29 },
+  { x: 0, y: 58 },
+  { x: -50.23, y: 29 },
+  { x: -50.23, y: -29 },
 ];
 
 function eyePairOffset(index, count) {
-  if (count === SIX_EYE_TRIANGLE.length) return SIX_EYE_TRIANGLE[index];
+  if (count === SIX_EYE_HEXAGON.length) return SIX_EYE_HEXAGON[index];
   return { x: (index - (count - 1) / 2) * 52, y: 0 };
 }
 

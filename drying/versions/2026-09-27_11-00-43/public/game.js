@@ -60,8 +60,6 @@ const splashScreen = document.getElementById('splash-screen');
 const gameOverScreen = document.getElementById('game-over-screen');
 const statsBar = document.getElementById('stats-bar');
 const calmHeading = document.getElementById('calm-heading');
-const roundHeading = document.getElementById('round-heading');
-const roundDetails = document.getElementById('round-details');
 const awayStat = document.getElementById('away-stat');
 const sidePanel = document.getElementById('side-panel');
 const paintHud = document.getElementById('paint-hud');
@@ -73,12 +71,6 @@ const dryingLabel = document.getElementById('drying-label');
 const dryingBar = document.getElementById('drying-bar');
 const captionBox = document.getElementById('caption-box');
 const awayBanner = document.getElementById('away-banner');
-const roundHud = document.getElementById('round-hud');
-const roundTitle = document.getElementById('round-title');
-const roundReward = document.getElementById('round-reward');
-const roundCurrency = document.getElementById('round-currency');
-const upgradeList = document.getElementById('upgrade-list');
-const nextRoundBtn = document.getElementById('next-round-btn');
 const colorSwatchesEl = document.getElementById('color-swatches');
 const startPaintingBtn = document.getElementById('start-painting-btn');
 const paintAgainBtn = document.getElementById('paint-again-btn');
@@ -101,165 +93,28 @@ const COLORS = [
   { name: 'Butter', hex: '#eccf7a' },
 ];
 
-const ROOM_SCENES = [
-  { kind: 'arctic', sky: ['#a9d9ef', '#e8f7fa'], sun: '#fff8dc', land: ['#8db9c8', '#f2fbff'], floor: ['#b9d3d4', '#6e9097', '#e0eeee'], shade: ['#d8eef0', '#8ba6aa'] },
-  { kind: 'beach', sky: ['#49b9d4', '#d5f3ed'], sun: '#fff3b1', land: ['#41a9b5', '#23758a'], floor: ['#d4b375', '#967044', '#f0d9a2'], shade: ['#e7dbb7', '#8d7751'] },
-  { kind: 'city', sky: ['#54779e', '#e0a184'], sun: '#ffe5bb', land: ['#525d70', '#303c52'], floor: ['#787878', '#464646', '#b1a89d'], shade: ['#e6a46e', '#875637'] },
-  { kind: 'desert', sky: ['#e99b5c', '#ffe0a0'], sun: '#fff0b6', land: ['#d99a50', '#a96242'], floor: ['#b76643', '#703e34', '#df9e6e'], shade: ['#efb45e', '#94623b'] },
-  { kind: 'earthy', sky: ['#b7a28b', '#e4d3b7'], sun: '#fff0c0', land: ['#a98260', '#73533f'], floor: ['#927452', '#594432', '#c1a57c'], shade: ['#d2b982', '#86704c'] },
-  { kind: 'forest', sky: ['#83bba8', '#e0edc6'], sun: '#fff1bd', land: ['#67956b', '#345d49'], floor: ['#71563e', '#493927', '#a48a5e'], shade: ['#bdd69a', '#68754b'] },
-  { kind: 'garden', sky: ['#91cce8', '#e4f3d3'], sun: '#fff3af', land: ['#8ac16d', '#4c874e'], floor: ['#ab8056', '#674832', '#d3ac75'], shade: ['#f0b7c1', '#93616d'] },
-  { kind: 'hills', sky: ['#82bbdf', '#eff0cf'], sun: '#fff3b2', land: ['#8cb36c', '#53774f'], floor: ['#92704c', '#59412e', '#c1a071'], shade: ['#e4d3a7', '#96865e'] },
-  { kind: 'icy', sky: ['#829dbb', '#dcecf2'], sun: '#f5fbff', land: ['#607d9c', '#d8e8f0'], floor: ['#7e98a8', '#455e70', '#b4c9d1'], shade: ['#e1eced', '#899a9b'] },
-  { kind: 'jaggedPeaks', sky: ['#4c79a0', '#d0e2e7'], sun: '#fff1c7', land: ['#637f91', '#354d61'], floor: ['#64727b', '#38434c', '#a0a7a2'], shade: ['#d0d7d5', '#7f8a87'] },
-];
-
-function roomScene() {
-  return ROOM_SCENES[(state.round - 1) % ROOM_SCENES.length];
-}
-
-function roomSceneName() {
-  return roomScene().kind
-    .replace(/([A-Z])/g, ' $1')
-    .replace(/^./, (letter) => letter.toUpperCase());
-}
-
 const DRY_DURATION_MS = 90 * 1000; // 90s of real time to fully dry, watched or not
 const SAMPLE_W = 60;
 const SAMPLE_H = 40;
 
 const PAINT_TIME_LIMIT_MS = 30 * 1000; // round timer for the painting phase
 const PAINT_TIME_BONUS = 10; // Moments of calm awarded for finishing the paint job in time
-const MAX_ROUNDS = 10;
-const UPGRADES = [
-  { id: 'brush', name: 'Bigger brush', max: 5, costForLevel: (level) => 100 * Math.pow(2, level - 1), description: 'A bigger brush makes painting the wall quicker.' },
-  { id: 'eyes', name: 'More Eyes', max: 5, costForLevel: (level) => 100 * Math.pow(2, level - 1), description: 'Adds one eye pair. Up to six pairs can earn calm.' },
-  { id: 'specs', name: 'Specs', max: 6, costForLevel: () => 200, description: 'Put glasses on an eye pair for x2 return, or x20 with Golden Eyes.' },
-  { id: 'goldEyes', name: 'Golden Eyes', max: 6, costForLevel: (level) => 500 * Math.pow(2, level - 1), description: 'Make an eye pair golden for x10 return, or x20 with Specs.' },
-  { id: 'goldSpecs', name: 'Magpeye · Golden Specs', max: 6, costForLevel: () => 200, description: 'Upgrade one pair of Specs for x5 return, or x50 with Golden Eyes.' },
-];
-
-function upgradeMaxLevel(def) {
-  return typeof def.max === 'function' ? def.max() : def.max;
-}
-
-function eyePairCount() {
-  return state.eyeSetUpgrades.length;
-}
-
-function eyePairMultiplier(index) {
-  const set = state.eyeSetUpgrades[index];
-  const golden = set.goldenEyes;
-  const hasSpecs = set.specs;
-  const goldenSpecs = set.goldSpecs;
-  if (golden) return goldenSpecs ? 50 : (hasSpecs ? 20 : 10);
-  if (goldenSpecs) return 5;
-  return hasSpecs ? 2 : 1;
-}
-
-function totalEyeMultiplier() {
-  let total = 0;
-  for (let i = 0; i < eyePairCount(); i++) total += eyePairMultiplier(i);
-  return total;
-}
-
-// At six pairs, arrange them in the requested three-row triangle:
-// one at the top, two in the middle, and three along the base.
-const SIX_EYE_TRIANGLE = [
-  { x: 0, y: -48 },
-  { x: -48, y: 0 },
-  { x: 48, y: 0 },
-  { x: -96, y: 48 },
-  { x: 0, y: 48 },
-  { x: 96, y: 48 },
-];
-
-function eyePairOffset(index, count) {
-  if (count === SIX_EYE_TRIANGLE.length) return SIX_EYE_TRIANGLE[index];
-  return { x: (index - (count - 1) / 2) * 52, y: 0 };
-}
-
-function eyePairOnScreen(index, x, y) {
-  const offset = eyePairOffset(index, eyePairCount());
-  const set = state.eyeSetUpgrades[index];
-  const halfWidth = set.specs ? 21 : 16;
-  const halfHeight = set.specs ? 14 : 11;
-  const px = x + offset.x;
-  const py = y + offset.y;
-  return px - halfWidth >= 0 && px + halfWidth <= CANVAS_W && py - halfHeight >= 0 && py + halfHeight <= CANVAS_H;
-}
-
-function countingEyePairsAt(x, y) {
-  if (document.visibilityState !== 'visible' || !state.pointerOverCanvas || !state.lastMouse) return [];
-  const eligible = [];
-  for (let index = 0; index < eyePairCount(); index++) {
-    if (!eyePairOnScreen(index, x, y)) continue;
-    const offset = eyePairOffset(index, eyePairCount());
-    const px = x + offset.x;
-    const py = y + offset.y;
-    if (isPaintable(px - 8.5, py) && isPaintable(px + 8.5, py)) eligible.push(index);
-  }
-  return eligible;
-}
-
-function upgradeRequirement(def, level) {
-  const trackIndex = UPGRADES.indexOf(def);
-  if (level > 1 && state.upgrades[def.id] < level - 1) return false;
-  if (level === 1 && trackIndex > 0 && state.upgrades[UPGRADES[trackIndex - 1].id] < 1) return false;
-  if ((def.id === 'specs' || def.id === 'goldEyes' || def.id === 'goldSpecs') && upgradeTargets(def).length === 0) return false;
-  if ((def.id === 'specs' || def.id === 'goldEyes' || def.id === 'goldSpecs') && level > upgradeTargets(def).length + state.upgrades[def.id]) return false;
-  if ((def.id === 'specs' || def.id === 'goldEyes') && level > eyePairCount()) return false;
-  if (def.id === 'goldSpecs' && level > state.upgrades.specs) return false;
-  return true;
-}
-
-function upgradeTargets(def) {
-  const targets = [];
-  for (let i = 0; i < state.eyeSetUpgrades.length; i++) {
-    const set = state.eyeSetUpgrades[i];
-    if (def.id === 'specs' && !set.specs) targets.push(i);
-    if (def.id === 'goldEyes' && !set.goldenEyes) targets.push(i);
-    if (def.id === 'goldSpecs' && set.specs && !set.goldSpecs) targets.push(i);
-  }
-  return targets;
-}
-
-function paintTimeLimitForRound(round) {
-  return Math.max(8000, PAINT_TIME_LIMIT_MS - (round - 1) * 2500);
-}
+const LOOK_AWAY_PENALTY_MS = 5000; // Moments of calm lost (as watchedMs) every time the player looks away
 
 const CAPTIONS = [
-  'A second has passed. The wall remains unconcerned.', 'Time flies; this paint prefers to stroll.', 'Your minute of observation has no known historical significance.',
-  'Somewhere, a clock is doing all the work.', 'This wall has achieved the same amount as you have by watching it.', 'The paint is drying at a rate best described as “eventually”.',
-  'An entire moment has gone by, with no witnesses of consequence.', 'If time is money, this wall is an unlicensed accountant.', 'The universe has not paused for this drying process.',
-  'You have watched a surface become slightly less wet. History will cope.', 'A minute here is still a minute somewhere else.', 'This paint has no plans for its afternoon.',
-  'The wall is winning the staring contest by not having eyes.', 'Every second matters. This one has been allocated to paint.', 'Your attention is valued by precisely nobody in the room.',
-  'The paint is drying. The cosmos is expanding. Priorities vary.', 'This is a very quiet use of a perfectly ordinary minute.', 'You could describe this as watching time pass with extra steps.',
-  'A moment of calm: mostly a moment with nothing happening.', 'The wall has declined to comment on your investment of time.', 'Somewhere, a more exciting wall is also drying.',
-  'The clock has moved. The paint has made a modest effort.', 'This may be the least consequential audience a wall has had.', 'Your patience is real; its impact on paint is not.',
-  'Time keeps going, even when the wall has no updates.', 'The paint has not noticed you. It is very focused.', 'A minute spent here cannot be exchanged for a better minute.',
-  'The wall’s progress report reads: still wall-shaped.', 'This is what happens when a surface gets a captive audience.', 'Nothing dramatic has happened since the last update.',
-  'You are now an expert witness to a drying wall.', 'The seconds are leaving. The paint is staying.', 'The wall is drying with no regard for your schedule.',
-  'A small amount of time has been donated to beige nothingness.', 'The paint might finish before anyone asks what you are doing.', 'This is not a shortcut to enlightenment.',
-  'One more tick of the clock; zero plot twists.', 'The wall’s ambition is to become dry and remain a wall.', 'The universe contains billions of stars and this particular patch.',
-  'Watching paint dry: proof that time can be both real and uneventful.', 'The minute hand has somewhere to be. The wall does not.', 'Your presence has not accelerated the paint by even a little.',
-  'The paint has no sense of urgency or audience etiquette.', 'A quiet moment passes, unnoticed by the wider universe.', 'This wall has been drying longer than this joke has been funny.',
-  'A second is a long time if you insist on counting it here.', 'The room has witnessed many things. This is one of them.', 'The paint is drying on its own schedule, as usual.',
-  'This moment will not appear in anyone’s memoirs.', 'Time passes. Paint dries. Nobody gets a medal.', 'You are giving this wall the attention it never requested.',
-  'The wall has no notifications, and still has nothing to report.', 'A minute ago, this was also happening.', 'Even the paint considers this a low-stakes situation.',
-  'The clock is productive by comparison.', 'This observation will not alter the course of events.', 'There is no hidden finale in the drying process.',
-  'The paint has moved from wet to less wet. A landmark of sorts.', 'All this time, the wall has remained impressively rectangular.', 'Your focus is admirable and entirely unnecessary.',
-  'Another second joins the vast archive of seconds nobody remembers.', 'A wall dries in the forest; does anyone update the score?', 'The paint is not reading the comments, either.',
-  'This is technically progress, if you are very generous.', 'Somewhere, dust is also settling without an audience.', 'The universe will not ask for your review of this wall.',
-  'An uneventful moment is still a moment, apparently.', 'This wall has never once checked the time.', 'The paint is making no promises about when it will be interesting.',
-  'You can tell the seconds apart only because the clock insists.', 'One day, this will be dry and completely unremarkable.', 'This is a fine place to practise doing absolutely nothing.',
-  'The wall has no need to impress you.', 'Time has passed, leaving no forwarding address.', 'The paint’s entire character arc is becoming dry.',
-  'No one will ask how closely you monitored this.', 'This minute has been spent on an activity with no sequel.', 'Even the room’s silence has more variety than the paint.',
-  'A little more dry; not a little more meaningful.', 'The clock advances without consulting the wall.', 'Somewhere, a calendar has just lost another square.',
-  'This is the slowest premiere with no cast or plot.', 'You have seen the wall do the same thing again.', 'The paint declines to make eye contact.',
-  'The seconds are numbered. The wall is not counting.', 'Your dedication will be forgotten at a perfectly normal rate.', 'There is no prize for noticing that it is still drying.',
-  'Another moment has found a place to disappear.', 'This wall’s legacy will be a new coat of paint.', 'The paint is almost as interested in this as you are.',
-  'The final seconds are still just seconds.', 'Soon it will be dry, and this will have happened.', 'Thank you for attending this deeply forgettable event.',
+  'Still wet.',
+  'This is riveting.',
+  "Rome wasn't built in a day. This wall might take longer.",
+  'Scientific consensus: still drying.',
+  'You could be doing literally anything else right now.',
+  'A fly briefly considers landing. Decides against it.',
+  'Somewhere, a kettle finishes boiling. This wall does not care.',
+  'Studies show 9 out of 10 walls dry eventually.',
+  'The paint appreciates your undivided attention.',
+  'Your dedication has been noted by absolutely no one.',
+  'This is the content you signed up for.',
+  'Patience is a virtue. So, apparently, is this.',
+  'Nothing is happening. Everything is happening, very slowly.',
 ];
 
 // ----------------------------------------------------------------------------
@@ -344,17 +199,8 @@ function postJson(url, data) {
 // actually watching the wall dry, plus a flat bonus for finishing the
 // paint job within the round timer. See tick()'s watchedMs accumulation
 // and beginDrying()'s paintBonusAwarded check.
-function roundWatchingScore() {
-  return state.eyeSetWatchedMs.reduce((score, watched, index) => score + Math.floor(watched / 1000) * eyePairMultiplier(index), 0);
-}
-
 function computeMomentsOfCalm() {
-  const activeRoundScore = state.phase === 'drying'
-    ? roundWatchingScore() + (state.paintBonusAwarded ? PAINT_TIME_BONUS : 0) - state.lookAwayCount * 5
-    : 0;
-  return Math.max(0,
-    state.totalMomentsOfCalmEarned + activeRoundScore - state.calmSpent
-  );
+  return Math.floor(state.watchedMs / 1000) + (state.paintBonusAwarded ? PAINT_TIME_BONUS : 0);
 }
 
 function submitScore() {
@@ -369,10 +215,10 @@ function submitScore() {
     coveragePercent: state.coveragePercent,
     momentsOfCalm: computeMomentsOfCalm(),
     paintBonusAwarded: state.paintBonusAwarded,
-    totalElapsedMs: state.totalElapsedMs,
-    watchedMs: state.totalWatchedMs,
-    awayMs: state.totalAwayMs,
-    lookAwayCount: state.totalLookAwayCount,
+    totalElapsedMs: state.paintStartedAt ? (Date.now() - state.paintStartedAt) : 0,
+    watchedMs: state.watchedMs,
+    awayMs: state.awayMs,
+    lookAwayCount: state.lookAwayCount,
   });
 }
 
@@ -402,7 +248,7 @@ async function fetchHighscores() {
 // Game state
 // ----------------------------------------------------------------------------
 const state = {
-  phase: 'splash', // 'splash' | 'painting' | 'drying' | 'intermission' | 'done'
+  phase: 'splash', // 'splash' | 'painting' | 'drying' | 'done'
   selectedColor: null,
   playerId: getOrCreatePlayerId(),
 
@@ -413,7 +259,7 @@ const state = {
   pointerOverCanvas: false,
   lastMouse: null,
 
-  paintStartedAt: null, // Date.now() when the current round began
+  paintStartedAt: null, // Date.now() when "Start Painting" was clicked
   dryStartedAt: null, // Date.now() when "Start Watching" was clicked
 
   dryProgress: 0, // 0..1, only advances while watching
@@ -421,17 +267,6 @@ const state = {
   watchedMs: 0,
   awayMs: 0,
   lookAwayCount: 0,
-  round: 1,
-  calmBank: 0,
-  calmSpent: 0,
-  totalMomentsOfCalmEarned: 0,
-  upgrades: { brush: 0, eyes: 0, specs: 0, goldEyes: 0, goldSpecs: 0 },
-  eyeSetUpgrades: [{ specs: false, goldenEyes: false, goldSpecs: false }],
-  totalWatchedMs: 0,
-  totalAwayMs: 0,
-  totalLookAwayCount: 0,
-  totalPaintBonus: 0,
-  totalElapsedMs: 0,
 
   lightAngle: 0,
   lightAngularVelocity: 0,
@@ -440,8 +275,8 @@ const state = {
   paintBonusAwarded: false,
   wallFilledAt100: false,
 
-  eyeBlinks: Array.from({ length: 6 }, () => ({ nextAt: null, until: 0 })), // each eye set has an independent blink schedule
-  eyeSetWatchedMs: [0],
+  nextBlinkAt: null, // performance.now() timestamp of the next scheduled blink, see scheduleNextBlink()
+  blinkUntil: 0, // performance.now() timestamp the current blink finishes at
 };
 
 // Roughly every 5 seconds, plus or minus up to 2 seconds - see
@@ -661,14 +496,13 @@ function paintDab(x, y) {
   if (!state.selectedColor) return;
   maybeKnockLight(x, y);
   if (!isPaintable(x, y)) return;
-  const brushSize = BRUSH_RADIUS * 0.8 * Math.pow(1.2, state.upgrades.brush);
-  const g = paintCtx.createRadialGradient(x, y, 0, x, y, brushSize);
+  const g = paintCtx.createRadialGradient(x, y, 0, x, y, BRUSH_RADIUS);
   g.addColorStop(0, rgbaString(state.selectedColor.hex, 0.95));
   g.addColorStop(0.75, rgbaString(state.selectedColor.hex, 0.85));
   g.addColorStop(1, rgbaString(state.selectedColor.hex, 0));
   paintCtx.fillStyle = g;
   paintCtx.beginPath();
-  paintCtx.arc(x, y, brushSize, 0, Math.PI * 2);
+  paintCtx.arc(x, y, BRUSH_RADIUS, 0, Math.PI * 2);
   paintCtx.fill();
 }
 
@@ -732,7 +566,7 @@ function fillRemainingGaps() {
 
 function updateCoverageUI() {
   state.coveragePercent = computeCoverage();
-  coverageLabel.textContent = `Round ${state.round} / ${MAX_ROUNDS} · Painted: ${state.coveragePercent}%`;
+  coverageLabel.textContent = `Painted: ${state.coveragePercent}%`;
   coverageBar.style.width = `${state.coveragePercent}%`;
 
   if (state.coveragePercent >= 100 && !state.wallFilledAt100) {
@@ -895,7 +729,6 @@ function drawEdges() {
 // fans back out diagonally to the full-width bottom corners of the
 // canvas at y=CANVAS_H.
 function drawFloor() {
-  const room = roomScene();
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(EDGE_W, WALL_H);
@@ -903,7 +736,7 @@ function drawFloor() {
   ctx.lineTo(CANVAS_W, CANVAS_H);
   ctx.lineTo(0, CANVAS_H);
   ctx.closePath();
-  ctx.fillStyle = room.floor[0];
+  ctx.fillStyle = '#8a6a45';
   ctx.fill();
 
   // Floorboard seams - clipped to the floor's own trapezoid, then drawn
@@ -912,9 +745,8 @@ function drawFloor() {
   // simple perspective floorboards receding away from the viewer.
   ctx.save();
   ctx.clip();
-  const PLANK_COUNT = 5 + (state.round % 7);
-  ctx.strokeStyle = room.floor[1];
-  ctx.globalAlpha = 0.65;
+  const PLANK_COUNT = 9;
+  ctx.strokeStyle = 'rgba(0,0,0,0.22)';
   ctx.lineWidth = 2;
   for (let i = 1; i < PLANK_COUNT; i++) {
     const t = i / PLANK_COUNT;
@@ -927,12 +759,10 @@ function drawFloor() {
   }
   // One cross-seam partway down, for a plank end-joint.
   ctx.beginPath();
-  const crossSeamY = WALL_H + (CANVAS_H - WALL_H) * (0.35 + (state.round % 5) * 0.1);
-  ctx.moveTo(EDGE_W * 0.5, crossSeamY);
-  ctx.lineTo(CANVAS_W - EDGE_W * 0.5, crossSeamY);
+  ctx.moveTo(EDGE_W * 0.5, WALL_H + (CANVAS_H - WALL_H) * 0.55);
+  ctx.lineTo(CANVAS_W - EDGE_W * 0.5, WALL_H + (CANVAS_H - WALL_H) * 0.55);
   ctx.stroke();
-  ctx.strokeStyle = room.floor[2];
-  ctx.globalAlpha = 0.28;
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
   ctx.lineWidth = 1;
   for (let i = 1; i < PLANK_COUNT; i++) {
     const t = i / PLANK_COUNT;
@@ -965,122 +795,17 @@ function drawFloor() {
   ctx.restore();
 }
 
-function drawWindowScenery(room, x, y, w, h) {
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(x, y, w, h);
-  ctx.clip();
-  const sky = ctx.createLinearGradient(x, y, x, y + h);
-  sky.addColorStop(0, room.sky[0]);
-  sky.addColorStop(1, room.sky[1]);
-  ctx.fillStyle = sky;
-  ctx.fillRect(x, y, w, h);
-
-  ctx.fillStyle = room.sun;
-  ctx.beginPath();
-  ctx.arc(x + w * 0.76, y + h * 0.22, 16, 0, Math.PI * 2);
-  ctx.fill();
-  if (['arctic', 'beach', 'city', 'desert', 'earthy', 'forest', 'garden', 'hills'].includes(room.kind)) {
-    ctx.fillStyle = 'rgba(255,255,255,0.65)';
-    [0, 1].forEach((i) => {
-      const cx = x + 35 + i * 95;
-      const cy = y + 58 + (i % 2) * 18;
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, 20, 7, 0, 0, Math.PI * 2);
-      ctx.ellipse(cx - 12, cy + 2, 10, 6, 0, 0, Math.PI * 2);
-      ctx.ellipse(cx + 12, cy + 2, 12, 6, 0, 0, Math.PI * 2);
-      ctx.fill();
-    });
-  }
-
-  if (room.kind === 'arctic') {
-    ctx.fillStyle = room.land[0];
-    ctx.beginPath(); ctx.moveTo(x, y + h * 0.78); ctx.lineTo(x + w * 0.23, y + h * 0.54); ctx.lineTo(x + w * 0.4, y + h * 0.78); ctx.lineTo(x + w * 0.7, y + h * 0.48); ctx.lineTo(x + w, y + h * 0.78); ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = room.land[1]; ctx.fillRect(x, y + h * 0.78, w, h * 0.22);
-  } else if (room.kind === 'icy' || room.kind === 'jaggedPeaks') {
-    ctx.fillStyle = room.land[0];
-    ctx.beginPath();
-    ctx.moveTo(x, y + h * 0.83);
-    if (room.kind === 'jaggedPeaks') {
-      ctx.lineTo(x + w * 0.17, y + h * 0.42); ctx.lineTo(x + w * 0.29, y + h * 0.62);
-      ctx.lineTo(x + w * 0.52, y + h * 0.2); ctx.lineTo(x + w * 0.7, y + h * 0.65);
-      ctx.lineTo(x + w * 0.84, y + h * 0.4); ctx.lineTo(x + w, y + h * 0.75);
-    } else {
-      ctx.lineTo(x + w * 0.28, y + h * 0.38); ctx.lineTo(x + w * 0.49, y + h * 0.78);
-      ctx.lineTo(x + w * 0.72, y + h * 0.3); ctx.lineTo(x + w, y + h * 0.8);
-    }
-    ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h); ctx.closePath(); ctx.fill();
-    ctx.fillStyle = room.land[1];
-    ctx.beginPath(); ctx.moveTo(x + w * 0.2, y + h * 0.47); ctx.lineTo(x + w * 0.28, y + h * 0.38); ctx.lineTo(x + w * 0.37, y + h * 0.55); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(x + w * 0.63, y + h * 0.48); ctx.lineTo(x + w * 0.72, y + h * 0.3); ctx.lineTo(x + w * 0.82, y + h * 0.52); ctx.closePath(); ctx.fill();
-    ctx.fillRect(x, y + h * 0.83, w, h * 0.17);
-  } else if (room.kind === 'beach') {
-    ctx.fillStyle = room.land[0]; ctx.fillRect(x, y + h * 0.59, w, h * 0.41);
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2;
-    for (let i = 0; i < 5; i++) {
-      const wy = y + h * (0.66 + i * 0.065);
-      ctx.beginPath(); ctx.moveTo(x + 8, wy); ctx.quadraticCurveTo(x + w * 0.4, wy - 5, x + w - 8, wy); ctx.stroke();
-    }
-    ctx.fillStyle = '#f7f0d9'; ctx.beginPath(); ctx.moveTo(x + 54, y + h * 0.58); ctx.lineTo(x + 54, y + h * 0.4); ctx.lineTo(x + 74, y + h * 0.58); ctx.fill();
-    ctx.fillStyle = '#704d44'; ctx.fillRect(x + 52, y + h * 0.58, 27, 3);
-    ctx.fillStyle = '#e6cf99'; ctx.beginPath(); ctx.moveTo(x, y + h * 0.83); ctx.quadraticCurveTo(x + w * 0.5, y + h * 0.68, x + w, y + h * 0.84); ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h); ctx.fill();
-  } else if (room.kind === 'city') {
-    ctx.fillStyle = room.land[1];
-    const heights = [0.36, 0.5, 0.29, 0.44, 0.34, 0.55, 0.38];
-    for (let i = 0; i < heights.length; i++) {
-      const bw = w / heights.length;
-      const bx = x + i * bw;
-      const bh = h * heights[i];
-      ctx.fillRect(bx, y + h - bh, bw - 2, bh);
-      ctx.fillStyle = '#ffe0a3';
-      for (let wy = y + h - bh + 9; wy < y + h - 6; wy += 13) {
-        if ((i + wy) % 3 !== 0) ctx.fillRect(bx + 5, wy, 3, 4);
-        if ((i + wy) % 2 === 0) ctx.fillRect(bx + 13, wy, 3, 4);
-      }
-      ctx.fillStyle = room.land[1];
-    }
-  } else if (room.kind === 'desert') {
-    ctx.fillStyle = room.land[0];
-    ctx.beginPath(); ctx.moveTo(x, y + h * 0.68); ctx.quadraticCurveTo(x + w * 0.28, y + h * 0.47, x + w * 0.55, y + h * 0.68); ctx.quadraticCurveTo(x + w * 0.78, y + h * 0.8, x + w, y + h * 0.55); ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h); ctx.fill();
-    ctx.fillStyle = room.land[1]; ctx.fillRect(x + w * 0.25, y + h * 0.62, 5, h * 0.18); ctx.fillRect(x + w * 0.21, y + h * 0.68, 13, 4); ctx.fillRect(x + w * 0.28, y + h * 0.73, 11, 4);
-  } else if (room.kind === 'earthy') {
-    ctx.fillStyle = room.land[0];
-    ctx.beginPath(); ctx.moveTo(x, y + h * 0.63); ctx.quadraticCurveTo(x + w * 0.45, y + h * 0.42, x + w, y + h * 0.7); ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h); ctx.fill();
-    ctx.fillStyle = room.land[1]; ctx.fillRect(x, y + h * 0.78, w, h * 0.22);
-    ctx.fillStyle = '#b9956c'; ctx.fillRect(x + w * 0.15, y + h * 0.72, w * 0.32, 4);
-  } else {
-    ctx.fillStyle = room.land[0];
-    ctx.beginPath(); ctx.moveTo(x, y + h * 0.68); ctx.quadraticCurveTo(x + w * 0.25, y + h * 0.44, x + w * 0.5, y + h * 0.67); ctx.quadraticCurveTo(x + w * 0.75, y + h * 0.85, x + w, y + h * 0.57); ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h); ctx.fill();
-    ctx.fillStyle = room.land[1];
-    ctx.beginPath(); ctx.moveTo(x, y + h * 0.82); ctx.quadraticCurveTo(x + w * 0.45, y + h * 0.58, x + w, y + h * 0.84); ctx.lineTo(x + w, y + h); ctx.lineTo(x, y + h); ctx.fill();
-    if (room.kind === 'forest') {
-      for (let i = 0; i < 7; i++) {
-        const tx = x + 12 + i * 42;
-        const ty = y + h * (0.63 + (i % 2) * 0.06);
-        ctx.fillStyle = room.land[1];
-        ctx.beginPath(); ctx.moveTo(tx, ty - 27); ctx.lineTo(tx - 12, ty + 3); ctx.lineTo(tx + 12, ty + 3); ctx.closePath(); ctx.fill();
-        ctx.fillRect(tx - 2, ty, 4, 10);
-      }
-    }
-    if (room.kind === 'garden') {
-      for (let i = 0; i < 6; i++) {
-        const fx = x + 15 + i * 31;
-        const fy = y + h * (0.78 + (i % 2) * 0.05);
-        ctx.fillStyle = '#f4d36f'; ctx.beginPath(); ctx.arc(fx, fy, 3, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = '#d97f9a'; ctx.beginPath(); ctx.arc(fx + 4, fy + 3, 3, 0, Math.PI * 2); ctx.fill();
-      }
-    }
-  }
-  ctx.restore();
-}
-
 function drawWindow() {
-  const room = roomScene();
   const { x, y, w, h } = WINDOW_RECT;
   ctx.save();
   ctx.fillStyle = '#5c4632';
   ctx.fillRect(x - 8, y - 8, w + 16, h + 16);
-  drawWindowScenery(room, x, y, w, h);
+
+  const g = ctx.createLinearGradient(x, y, x, y + h);
+  g.addColorStop(0, '#8fc7e8');
+  g.addColorStop(1, '#cfe9f5');
+  ctx.fillStyle = g;
+  ctx.fillRect(x, y, w, h);
 
   ctx.fillStyle = 'rgba(255,255,255,0.22)';
   ctx.beginPath();
@@ -1107,7 +832,6 @@ function drawWindow() {
 }
 
 function drawLight() {
-  const room = roomScene();
   const attach = { x: LIGHT_ATTACH_X, y: LIGHT_ATTACH_Y };
   const lamp = getLampPosition();
 
@@ -1121,42 +845,22 @@ function drawLight() {
 
   ctx.translate(lamp.x, lamp.y);
   ctx.rotate(state.lightAngle);
-  // The bulb sits behind the shade so its glow peeks out beneath the rim.
+  ctx.beginPath();
+  ctx.moveTo(-14, 0);
+  ctx.lineTo(14, 0);
+  ctx.lineTo(24, 26);
+  ctx.lineTo(-24, 26);
+  ctx.closePath();
+  ctx.fillStyle = '#e8dcc0';
+  ctx.fill();
+  ctx.strokeStyle = '#8a6b4f';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
   ctx.beginPath();
   ctx.ellipse(0, 30, 10, 6, 0, 0, Math.PI * 2);
   ctx.fillStyle = 'rgba(255,244,200,0.75)';
   ctx.fill();
-
-  ctx.beginPath();
-  const shadeVariant = (state.round - 1) % 10;
-  if (shadeVariant === 0) {
-    ctx.moveTo(-14, 0); ctx.lineTo(14, 0); ctx.lineTo(24, 26); ctx.lineTo(-24, 26);
-  } else if (shadeVariant === 1) {
-    ctx.moveTo(-15, 0); ctx.lineTo(15, 0); ctx.quadraticCurveTo(16, 17, 27, 25); ctx.lineTo(-27, 25); ctx.quadraticCurveTo(-16, 17, -15, 0);
-  } else if (shadeVariant === 2) {
-    ctx.moveTo(-13, 0); ctx.lineTo(13, 0); ctx.lineTo(22, 18); ctx.quadraticCurveTo(0, 34, -22, 18);
-  } else if (shadeVariant === 3) {
-    ctx.moveTo(-13, 0); ctx.lineTo(13, 0); ctx.lineTo(24, 11); ctx.lineTo(19, 27); ctx.lineTo(-19, 27); ctx.lineTo(-24, 11);
-  } else if (shadeVariant === 4) {
-    ctx.moveTo(-16, 0); ctx.lineTo(16, 0); ctx.quadraticCurveTo(14, 17, 26, 22); ctx.lineTo(22, 29); ctx.lineTo(-22, 29); ctx.lineTo(-26, 22); ctx.quadraticCurveTo(-14, 17, -16, 0);
-  } else if (shadeVariant === 5) {
-    ctx.moveTo(-12, 0); ctx.lineTo(12, 0); ctx.lineTo(30, 25); ctx.lineTo(-30, 25);
-  } else if (shadeVariant === 6) {
-    ctx.moveTo(-16, 0); ctx.lineTo(16, 0); ctx.quadraticCurveTo(22, 12, 19, 27); ctx.lineTo(-19, 27); ctx.quadraticCurveTo(-22, 12, -16, 0);
-  } else if (shadeVariant === 7) {
-    ctx.moveTo(-18, 0); ctx.lineTo(18, 0); ctx.lineTo(25, 22); ctx.lineTo(18, 30); ctx.lineTo(-18, 30); ctx.lineTo(-25, 22);
-  } else if (shadeVariant === 8) {
-    ctx.moveTo(-12, 0); ctx.lineTo(12, 0); ctx.lineTo(24, 15); ctx.lineTo(24, 26); ctx.lineTo(-24, 26); ctx.lineTo(-24, 15);
-  } else {
-    ctx.moveTo(-18, 0); ctx.lineTo(18, 0); ctx.quadraticCurveTo(12, 14, 30, 25); ctx.lineTo(-30, 25); ctx.quadraticCurveTo(-12, 14, -18, 0);
-  }
-  ctx.closePath();
-  ctx.fillStyle = room.shade[0];
-  ctx.fill();
-  ctx.strokeStyle = room.shade[1];
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
   ctx.restore();
 }
 
@@ -1169,7 +873,7 @@ function drawPaintTimer() {
   // Clamped at zero rather than counting into negative time - once the
   // limit is up the whole box just turns red and sits at 0:00 as a flat
   // "time's up" signal, instead of ticking away how far over you've gone.
-  const remainingMs = Math.max(0, paintTimeLimitForRound(state.round) - (Date.now() - state.paintStartedAt));
+  const remainingMs = Math.max(0, PAINT_TIME_LIMIT_MS - (Date.now() - state.paintStartedAt));
   const over = remainingMs <= 0;
   const totalSeconds = Math.floor(remainingMs / 1000);
   const mins = Math.floor(totalSeconds / 60);
@@ -1194,8 +898,6 @@ function drawBrushCursor(x, y, colorHex) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(-Math.PI / 4);
-  const brushScale = 0.8 * Math.pow(1.2, state.upgrades.brush);
-  ctx.scale(brushScale, brushScale);
   ctx.fillStyle = colorHex;
   ctx.fillRect(-7, -16, 14, 16);
   ctx.strokeStyle = 'rgba(0,0,0,0.25)';
@@ -1208,69 +910,44 @@ function drawBrushCursor(x, y, colorHex) {
   ctx.restore();
 }
 
-// Each pair earns independently while its eye shapes are over the painted
-// wall and fully inside the canvas. Ineligible or blinking pairs close;
-// every pair has its own blink timer in randomBlinkDelayMs()/tick().
-function drawEyesCursor(x, y, now) {
+// "counting" is false when the eyes are over the window/roof/floor/edges
+// during drying - a visual echo of isCurrentlyWatching()'s gating, so
+// it's obvious on screen that hovering off the wall doesn't earn Moments
+// of calm: the eyes go half-lidded and grey instead of open and white.
+// "blinking" briefly overrides that with a fully-shut eye - see
+// randomBlinkDelayMs()/tick() for the ~5s-ish (+/-2s) schedule.
+function drawEyesCursor(x, y, counting, blinking) {
   ctx.save();
-  const pairCount = eyePairCount();
-  const eligiblePairs = countingEyePairsAt(x, y);
-  for (let set = 0; set < pairCount; set++) {
-    const offset = eyePairOffset(set, pairCount);
-    const centerX = x + offset.x;
-    const centerY = y + offset.y;
-    const eyeSet = state.eyeSetUpgrades[set];
-    const golden = eyeSet.goldenEyes;
-    const hasSpecs = eyeSet.specs;
-    const goldenSpecs = eyeSet.goldSpecs;
-    const frameColor = goldenSpecs ? '#e7b93f' : '#252525';
-    const eyeOffsets = [-8.5, 8.5];
-    const blink = !eligiblePairs.includes(set) || now < state.eyeBlinks[set].until;
-    eyeOffsets.forEach((offset) => {
-      const dx = centerX + offset;
-      ctx.beginPath();
-      if (blink) {
-        ctx.strokeStyle = goldenSpecs ? frameColor : '#252525';
-        ctx.lineWidth = 2.5;
-        ctx.moveTo(dx - 6, centerY);
-        ctx.quadraticCurveTo(dx, centerY + 3, dx + 6, centerY);
-        ctx.stroke();
-      } else {
-        ctx.ellipse(dx, centerY, 6, 9, 0, 0, Math.PI * 2);
-        ctx.fillStyle = '#ffffff';
-        ctx.fill();
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = '#252525';
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(dx, centerY, 3, 0, Math.PI * 2);
-        ctx.fillStyle = golden ? '#d5a51e' : '#2a2a2a';
-        ctx.fill();
-      }
-    });
-    if (hasSpecs) {
-      [-10, 10].forEach((lensOffset) => {
-        const lensX = centerX + lensOffset;
-        ctx.strokeStyle = frameColor;
-        ctx.lineWidth = 3;
-        ctx.lineJoin = 'round';
-        ctx.beginPath();
-        ctx.moveTo(lensX - 6, centerY - 11); ctx.lineTo(lensX + 6, centerY - 11);
-        ctx.quadraticCurveTo(lensX + 9, centerY - 11, lensX + 9, centerY - 8);
-        ctx.lineTo(lensX + 9, centerY + 8); ctx.quadraticCurveTo(lensX + 9, centerY + 11, lensX + 6, centerY + 11);
-        ctx.lineTo(lensX - 6, centerY + 11); ctx.quadraticCurveTo(lensX - 9, centerY + 11, lensX - 9, centerY + 8);
-        ctx.lineTo(lensX - 9, centerY - 8); ctx.quadraticCurveTo(lensX - 9, centerY - 11, lensX - 6, centerY - 11);
-        ctx.closePath(); ctx.stroke();
-      });
-      ctx.beginPath();
-      ctx.moveTo(centerX - 2, centerY - 3);
-      ctx.quadraticCurveTo(centerX, centerY - 5, centerX + 2, centerY - 3);
-      ctx.strokeStyle = frameColor;
-      ctx.lineWidth = 3;
-      ctx.lineCap = 'round';
+  ctx.translate(x, y);
+  ctx.globalAlpha = counting ? 1 : 0.5;
+  [-13, 13].forEach((dx) => {
+    ctx.beginPath();
+    if (blinking) {
+      // Fully shut - a simple closed-lid curve, no white/pupil at all.
+      ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+      ctx.lineWidth = 2;
+      ctx.moveTo(dx - 9, 0);
+      ctx.quadraticCurveTo(dx, 3, dx + 9, 0);
       ctx.stroke();
+      return;
     }
-  }
+    if (counting) {
+      ctx.ellipse(dx, 0, 9, 12, 0, 0, Math.PI * 2);
+    } else {
+      ctx.ellipse(dx, 0, 9, 5, 0, 0, Math.PI * 2); // half-lidded when not counting
+    }
+    ctx.fillStyle = counting ? '#ffffff' : '#c7c7c7';
+    ctx.fill();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.stroke();
+    if (counting) {
+      ctx.beginPath();
+      ctx.arc(dx, 0, 4, 0, Math.PI * 2);
+      ctx.fillStyle = '#2a2a2a';
+      ctx.fill();
+    }
+  });
   ctx.restore();
 }
 
@@ -1291,11 +968,13 @@ function renderCanvas() {
   // Custom cursor - only drawn while the pointer is actually over the
   // canvas (see the pointerenter/pointerleave handlers above). A
   // paintbrush (bristles tinted with the chosen colour) while there's
-  // still painting to do, switching to the purchased sets of eyes once the
+  // still painting to do, switching to a pair of watching eyes once the
   // wall is fully covered or once we're in the drying phase proper.
   if ((state.phase === 'painting' || state.phase === 'drying') && state.pointerOverCanvas && state.lastMouse) {
     if (state.phase === 'drying' || state.coveragePercent >= 100) {
-      drawEyesCursor(state.lastMouse.x, state.lastMouse.y, performance.now());
+      const counting = isPaintable(state.lastMouse.x, state.lastMouse.y);
+      const blinking = state.phase === 'drying' && counting && performance.now() < state.blinkUntil;
+      drawEyesCursor(state.lastMouse.x, state.lastMouse.y, counting, blinking);
     } else if (state.selectedColor) {
       drawBrushCursor(state.lastMouse.x, state.lastMouse.y, state.selectedColor.hex);
     }
@@ -1307,21 +986,20 @@ function renderCanvas() {
 // ----------------------------------------------------------------------------
 let captionIndex = 0;
 function showNextCaption() {
-  if (captionIndex >= CAPTIONS.length - 1) return;
   captionBox.classList.add('fading');
   setTimeout(() => {
-    captionIndex++;
+    captionIndex = (captionIndex + 1) % CAPTIONS.length;
     captionBox.textContent = CAPTIONS[captionIndex];
     captionBox.classList.remove('fading');
   }, 400);
 }
 
 function startCaptionRotation() {
-  if (captionIndex >= CAPTIONS.length) captionIndex = CAPTIONS.length - 1;
-  captionBox.textContent = CAPTIONS[captionIndex];
+  captionIndex = 0;
+  captionBox.textContent = CAPTIONS[0];
   captionBox.classList.remove('fading');
   if (captionInterval) clearInterval(captionInterval);
-  captionInterval = setInterval(showNextCaption, 10000);
+  captionInterval = setInterval(showNextCaption, 7000);
 }
 
 function stopCaptionRotation() {
@@ -1346,17 +1024,15 @@ function formatMinSec(ms) {
 // below.
 function isCurrentlyWatching() {
   if (document.visibilityState !== 'visible' || !state.pointerOverCanvas || !state.lastMouse) return false;
-  return countingEyePairsAt(state.lastMouse.x, state.lastMouse.y).length > 0;
+  // Has to be over the actual painted wall - hovering the window, the
+  // roof, the floor, or the side returns doesn't count. isPaintable()
+  // already describes exactly that rectangle (minus the window cutout).
+  return isPaintable(state.lastMouse.x, state.lastMouse.y);
 }
 
 function updateWatchStats() {
-  calmHeading.textContent = computeMomentsOfCalm();
-  awayStat.textContent = `${formatMinSec(state.totalAwayMs + state.awayMs)} (${state.totalLookAwayCount + state.lookAwayCount}x)`;
-  roundHeading.textContent = roomSceneName();
-  const paintMs = state.phase === 'painting'
-    ? Math.max(0, paintTimeLimitForRound(state.round) - (Date.now() - state.paintStartedAt))
-    : paintTimeLimitForRound(state.round);
-  roundDetails.textContent = `${state.round} / ${MAX_ROUNDS} · Paint ${formatMinSec(paintMs)} · Dry ${formatMinSec(DRY_DURATION_MS)}`;
+  calmHeading.textContent = `Moments of calm: ${Math.floor(state.watchedMs / 1000)}`;
+  awayStat.textContent = `Looked away: ${formatMinSec(state.awayMs)} (${state.lookAwayCount}x)`;
 }
 
 function tick(now) {
@@ -1374,17 +1050,17 @@ function tick(now) {
     // wall-clock time spent actually watching the wall dry (mouse over
     // the canvas, tab visible). This is what pauses when you look away,
     // not the drying itself.
-    const eligiblePairs = state.pointerOverCanvas && state.lastMouse
-      ? countingEyePairsAt(state.lastMouse.x, state.lastMouse.y)
-      : [];
-    const watching = eligiblePairs.length > 0;
+    const watching = isCurrentlyWatching();
     if (state.wasWatching === null) {
       state.wasWatching = watching;
     } else if (watching !== state.wasWatching) {
       if (!watching) {
         state.lookAwayCount++;
-        // Look-aways cost a flat 5 calm, independent of the More Eyes
-        // multiplier applied to each watched second.
+        // Losing 5 Moments of calm per look-away, applied directly as a
+        // watchedMs deduction so it's reflected everywhere the score is
+        // computed from watchedMs (the live heading, the game-over
+        // screen, the submitted score) without a separate penalty field.
+        state.watchedMs = Math.max(0, state.watchedMs - LOOK_AWAY_PENALTY_MS);
         awayBanner.classList.remove('hidden');
       } else {
         awayBanner.classList.add('hidden');
@@ -1395,36 +1071,19 @@ function tick(now) {
 
     if (watching) {
       state.watchedMs += dt;
-      eligiblePairs.forEach((i) => { state.eyeSetWatchedMs[i] += dt; });
 
       // BLINKING - only while actually watching, so looking away can't
       // "bank" a blink for the moment you look back. First watched frame
       // schedules the first blink; after that, each blink's own end time
       // schedules the next one, 5s +/- 2s later.
-      for (let i = 0; i < eyePairCount(); i++) {
-        if (!eligiblePairs.includes(i)) {
-          state.eyeBlinks[i].nextAt = null;
-          state.eyeBlinks[i].until = 0;
-          continue;
-        }
-        const blink = state.eyeBlinks[i];
-        if (blink.nextAt === null) {
-          blink.nextAt = now + randomBlinkDelayMs();
-        } else if (now >= blink.until && now >= blink.nextAt) {
-          blink.until = now + 150;
-          blink.nextAt = blink.until + randomBlinkDelayMs();
-        }
-      }
-      for (let i = eyePairCount(); i < state.eyeBlinks.length; i++) {
-        state.eyeBlinks[i].nextAt = null;
-        state.eyeBlinks[i].until = 0;
+      if (state.nextBlinkAt === null) {
+        state.nextBlinkAt = now + randomBlinkDelayMs();
+      } else if (now >= state.blinkUntil && now >= state.nextBlinkAt) {
+        state.blinkUntil = now + 150;
+        state.nextBlinkAt = state.blinkUntil + randomBlinkDelayMs();
       }
     } else {
       state.awayMs += dt;
-      state.eyeBlinks.forEach((blink) => {
-        blink.nextAt = null;
-        blink.until = 0;
-      });
     }
 
     dryingLabel.textContent = `Drying: ${Math.round(state.dryProgress * 100)}%`;
@@ -1438,7 +1097,6 @@ function tick(now) {
       finishDrying();
     }
   }
-  if (state.phase === 'painting') updateWatchStats();
 
   renderCanvas();
   rafHandle = requestAnimationFrame(tick);
@@ -1456,129 +1114,10 @@ function stopRenderLoop() {
 }
 
 function finishDrying() {
+  state.phase = 'done';
   stopCaptionRotation();
-  state.phase = 'intermission';
-  state.totalElapsedMs += state.paintStartedAt ? Date.now() - state.paintStartedAt : 0;
-  state.totalWatchedMs += state.watchedMs;
-  state.totalAwayMs += state.awayMs;
-  state.totalLookAwayCount += state.lookAwayCount;
-  const roundCalm = roundWatchingScore() +
-    (state.paintBonusAwarded ? PAINT_TIME_BONUS : 0) - state.lookAwayCount * 5;
-  state.totalMomentsOfCalmEarned += roundCalm;
-  state.totalPaintBonus += state.paintBonusAwarded ? PAINT_TIME_BONUS : 0;
-  state.calmBank = computeMomentsOfCalm();
-  if (state.round >= MAX_ROUNDS) {
-    state.phase = 'done';
-    showGameOverScreen();
-    return;
-  }
-  if (captionIndex < CAPTIONS.length - 1) captionIndex++;
-  state.phase = 'intermission';
-  roundTitle.textContent = `Round ${state.round} complete`;
-  roundReward.textContent = state.paintBonusAwarded
-    ? 'Fast finish! Your time bonus is included in your Moments of calm.'
-    : `The next wall gives you less time to paint. Drying still takes ${formatMinSec(DRY_DURATION_MS)}.`;
-  renderUpgradeList();
-  roundHud.style.minHeight = `${Math.round(dryingHud.getBoundingClientRect().height)}px`;
-  roundHud.style.height = 'auto';
-  roundHud.scrollTop = 0;
-  dryingHud.classList.add('hidden');
-  roundHud.classList.remove('hidden');
+  showGameOverScreen();
 }
-
-function renderUpgradeList() {
-  roundCurrency.textContent = `Available Moments of calm: ${state.calmBank}`;
-  const rows = [];
-  UPGRADES.forEach((u) => {
-    const ownedLevel = state.upgrades[u.id];
-    const maxLevel = upgradeMaxLevel(u);
-    const level = ownedLevel + 1;
-    if (level > maxLevel) {
-      rows.push(`<div class="upgrade-item upgrade-complete"><div><strong>${u.name} · Level ${maxLevel}/${maxLevel}</strong><span>Complete</span></div></div>`);
-      return;
-    }
-    const cost = u.costForLevel(level);
-    const trackIndex = UPGRADES.indexOf(u);
-    const previous = trackIndex > 0 ? UPGRADES[trackIndex - 1] : null;
-    const previousLocked = previous && state.upgrades[previous.id] < 1;
-    const requirementMet = !previousLocked && upgradeRequirement(u, level);
-    const canBuy = requirementMet && state.calmBank >= cost;
-    let details = u.description;
-    if (u.id === 'brush') details = `Next: 20% bigger brush · ${cost} Moments of calm`;
-    if (u.id === 'eyes') details = `Next: add an eye pair · ${cost} Moments of calm`;
-    if (u.id === 'specs') details = `Next: add Specs to an eye pair · double return · ${cost} Moments of calm`;
-    if (u.id === 'goldEyes') details = `Next: Golden Eyes · 10× return (20× with Specs) · ${cost} Moments of calm`;
-    if (u.id === 'goldSpecs') details = `Next: Golden Specs · 5× return (50× with Golden Eyes) · ${cost} Moments of calm`;
-    const targets = upgradeTargets(u);
-    const targetPicker = canBuy && targets.length
-      ? `<label class="upgrade-target-label">Eye pair <select class="upgrade-target" data-target-for="${u.id}" data-level="${level}">${targets.map((target) => `<option value="${target}">#${target + 1}</option>`).join('')}</select></label>`
-      : '';
-    const lockedReason = previousLocked
-      ? `Buy level 1 of ${previous.name} before this upgrade.`
-      : 'You need an eligible eye pair before buying this upgrade.';
-    const status = previousLocked || !requirementMet
-      ? `<a class="upgrade-state upgrade-state-locked" tabindex="0" title="${lockedReason}" aria-label="Locked. ${lockedReason}">Locked</a>`
-      : (!canBuy
-        ? `<a class="upgrade-state upgrade-state-unaffordable" tabindex="0" title="You need ${cost - state.calmBank} more Moments of calm to buy this level." aria-label="Unaffordable. You need ${cost - state.calmBank} more Moments of calm.">Unaffordable</a>`
-        : '<span class="upgrade-state upgrade-state-ready">Ready</span>');
-    const lockClass = previousLocked || !requirementMet ? 'upgrade-prerequisite-locked' : (!canBuy ? 'upgrade-unaffordable' : '');
-    rows.push(`<div class="upgrade-item ${canBuy ? 'upgrade-ready' : 'upgrade-locked'} ${lockClass}"><div class="upgrade-copy"><div class="upgrade-title-line"><strong>${u.name} · Level ${ownedLevel}/${maxLevel}</strong>${status}</div><small>${details}</small>${targetPicker}</div>${canBuy ? `<button type="button" data-upgrade="${u.id}" data-level="${level}">Buy</button>` : ''}</div>`);
-  });
-  upgradeList.innerHTML = rows.join('');
-  Array.from(upgradeList.querySelectorAll('[data-upgrade]')).forEach((button) => {
-    button.addEventListener('click', () => {
-      const def = UPGRADES.find((item) => item.id === button.getAttribute('data-upgrade'));
-      if (!def) return;
-      const level = parseInt(button.getAttribute('data-level'), 10);
-      const cost = def.costForLevel(level);
-      if (state.upgrades[def.id] + 1 !== level || !upgradeRequirement(def, level) || state.calmBank < cost) return;
-      let target = -1;
-      if (def.id === 'specs' || def.id === 'goldEyes' || def.id === 'goldSpecs') {
-        const select = upgradeList.querySelector(`[data-target-for="${def.id}"][data-level="${level}"]`);
-        target = select ? parseInt(select.value, 10) : -1;
-        if (target < 0 || upgradeTargets(def).indexOf(target) === -1) return;
-      }
-      state.calmBank -= cost;
-      state.calmSpent += cost;
-      state.upgrades[def.id]++;
-      if (def.id === 'eyes') {
-        state.eyeSetUpgrades.push({ specs: false, goldenEyes: false, goldSpecs: false });
-      } else if (def.id === 'specs' || def.id === 'goldEyes' || def.id === 'goldSpecs') {
-        if (def.id === 'specs') state.eyeSetUpgrades[target].specs = true;
-        if (def.id === 'goldEyes') state.eyeSetUpgrades[target].goldenEyes = true;
-        if (def.id === 'goldSpecs') state.eyeSetUpgrades[target].goldSpecs = true;
-      }
-      updateWatchStats();
-      renderUpgradeList();
-    });
-  });
-}
-
-function startRound(round) {
-  state.round = round;
-  state.phase = 'painting';
-  state.paintStartedAt = Date.now();
-  state.dryStartedAt = null;
-  state.dryProgress = 0;
-  state.watchedMs = 0;
-  state.awayMs = 0;
-  state.lookAwayCount = 0;
-  state.wasWatching = null;
-  state.paintBonusAwarded = false;
-  state.pointerOverCanvas = false;
-  state.lastMouse = null;
-  resetWall();
-  roundHud.classList.add('hidden');
-  paintHud.classList.remove('hidden');
-  dryingHud.classList.add('hidden');
-  coverageLabel.textContent = `Round ${round} / ${MAX_ROUNDS} · Painted: 0%`;
-  statsBar.classList.remove('hidden');
-  updateWatchStats();
-  startRenderLoop();
-  startCoverageSampling();
-}
-
-nextRoundBtn.addEventListener('click', () => startRound(state.round + 1));
 
 // ----------------------------------------------------------------------------
 // Screen transitions
@@ -1608,12 +1147,18 @@ function initColorSwatches() {
 
 startPaintingBtn.addEventListener('click', () => {
   if (!state.selectedColor) return;
+  state.phase = 'painting';
+  state.paintStartedAt = Date.now();
+  resetWall();
   splashScreen.classList.add('fading-out');
   setTimeout(() => splashScreen.classList.add('hidden'), 350);
+  statsBar.classList.remove('hidden');
+  updateWatchStats();
   sidePanel.classList.remove('hidden');
   paintHud.classList.remove('hidden');
   dryingHud.classList.add('hidden');
-  startRound(1);
+  startRenderLoop();
+  startCoverageSampling();
 });
 
 // Automatic - no button to click. Once the wall reads 100% painted (see
@@ -1622,7 +1167,7 @@ startPaintingBtn.addEventListener('click', () => {
 function beginDrying() {
   stopCoverageSampling();
   state.paintBonusAwarded = state.paintStartedAt
-    ? (Date.now() - state.paintStartedAt) <= paintTimeLimitForRound(state.round)
+    ? (Date.now() - state.paintStartedAt) <= PAINT_TIME_LIMIT_MS
     : false;
   state.phase = 'drying';
   state.dryStartedAt = Date.now();
@@ -1631,8 +1176,8 @@ function beginDrying() {
   state.awayMs = 0;
   state.lookAwayCount = 0;
   state.wasWatching = null;
-  state.eyeSetWatchedMs = Array.from({ length: eyePairCount() }, () => 0);
-  state.eyeBlinks = Array.from({ length: 6 }, () => ({ nextAt: null, until: 0 }));
+  state.nextBlinkAt = null;
+  state.blinkUntil = 0;
   paintHud.classList.add('hidden');
   dryingHud.classList.remove('hidden');
   awayBanner.classList.add('hidden');
@@ -1640,21 +1185,14 @@ function beginDrying() {
 }
 
 function showGameOverScreen() {
-  const purchasedUpgrades = UPGRADES
-    .filter((upgrade) => state.upgrades[upgrade.id] > 0)
-    .map((upgrade) => `<li>${escapeHtml(upgrade.name)}: Level ${state.upgrades[upgrade.id]}/${upgradeMaxLevel(upgrade)}</li>`)
-    .join('');
+  const totalElapsedMs = state.paintStartedAt ? (Date.now() - state.paintStartedAt) : 0;
+  const momentsOfCalm = computeMomentsOfCalm();
   gameOverStats.innerHTML = `
-    <p class="score-line">Rounds completed: <strong>${state.round} / ${MAX_ROUNDS}</strong></p>
-    <p class="score-line">Moments of calm: <strong>${computeMomentsOfCalm()}</strong></p>
-    <p>Moments of calm spent: <strong>${state.calmSpent}</strong></p>
-    <p>Unspent Moments of calm: <strong>${state.calmBank}</strong></p>
-    <p>Purchased upgrades:</p>
-    ${purchasedUpgrades ? `<ul class="score-upgrades">${purchasedUpgrades}</ul>` : '<p>None</p>'}
+    <p class="score-line">Moments of calm: <strong>${momentsOfCalm}</strong>${state.paintBonusAwarded ? ` <span class="bonus-tag">(+${PAINT_TIME_BONUS} in-time bonus)</span>` : ''}</p>
     <p>Colour: <strong>${escapeHtml(state.selectedColor ? state.selectedColor.name : 'Unknown')}</strong></p>
-    <p>Total time (paint + dry): <strong>${formatMinSec(state.totalElapsedMs)}</strong></p>
-    <p>Time actually watching: <strong>${formatMinSec(state.totalWatchedMs)}</strong></p>
-    <p>Time spent looking away: <strong>${formatMinSec(state.totalAwayMs)}</strong> (${state.totalLookAwayCount}x)</p>
+    <p>Total time (paint + dry): <strong>${formatMinSec(totalElapsedMs)}</strong></p>
+    <p>Time actually watching: <strong>${Math.floor(state.watchedMs / 1000)}s</strong></p>
+    <p>Time spent looking away: <strong>${formatMinSec(state.awayMs)}</strong> (${state.lookAwayCount}x)</p>
   `;
   dryingHud.classList.add('hidden');
   gameOverScreen.classList.remove('hidden');
@@ -1665,17 +1203,6 @@ function showGameOverScreen() {
 
 function resetToSplash() {
   state.phase = 'splash';
-  state.round = 1;
-  state.calmBank = 0;
-  state.calmSpent = 0;
-  state.totalMomentsOfCalmEarned = 0;
-  state.upgrades = { brush: 0, eyes: 0, specs: 0, goldEyes: 0, goldSpecs: 0 };
-  state.eyeSetUpgrades = [{ specs: false, goldenEyes: false, goldSpecs: false }];
-  state.totalWatchedMs = 0;
-  state.totalAwayMs = 0;
-  state.totalLookAwayCount = 0;
-  state.totalPaintBonus = 0;
-  state.totalElapsedMs = 0;
   state.selectedColor = null;
   state.paintStartedAt = null;
   state.dryStartedAt = null;
@@ -1687,9 +1214,8 @@ function resetToSplash() {
   state.pointerOverCanvas = false;
   state.lastMouse = null;
   state.paintBonusAwarded = false;
-  state.eyeBlinks = Array.from({ length: 6 }, () => ({ nextAt: null, until: 0 }));
-  state.eyeSetWatchedMs = [0];
-  captionIndex = 0;
+  state.nextBlinkAt = null;
+  state.blinkUntil = 0;
   resetWall();
   stopCaptionRotation();
   stopCoverageSampling();
@@ -1704,7 +1230,6 @@ function resetToSplash() {
   sidePanel.classList.add('hidden');
   paintHud.classList.remove('hidden');
   dryingHud.classList.add('hidden');
-  roundHud.classList.add('hidden');
   splashScreen.classList.remove('hidden');
   splashScreen.classList.remove('fading-out');
 

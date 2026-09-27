@@ -27,8 +27,7 @@
     var select = wrap.querySelector('select');
     select.value = saved;
     select.addEventListener('change', function () { apply(select.value); });
-    var header = document.getElementById('site-header');
-    (header || document.body).appendChild(wrap);
+    document.body.appendChild(wrap);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount);
   else mount();

@@ -19,7 +19,6 @@ body {
    on the splash screen, so the page reads as an actual page rather than
    a canvas floating in space. */
 #site-header {
-  position: relative;
   flex: 0 0 auto;
   text-align: center;
   padding: 18px 24px 14px;
@@ -54,81 +53,36 @@ body {
   margin: 0 8px;
 }
 
-/* Persistent game header: calm at left, round status centred, disturbances at right. */
+/* Persistent stats bar above the wall - Moments of calm (the score) is
+   the big, left-aligned heading; Looked away is the secondary,
+   right-aligned stat. Stays in place for the whole game once painting
+   starts, through drying and game-over - unlike the paint/drying panel,
+   it never changes which fields it shows. */
 #stats-bar {
-  position: relative;
-  z-index: 2;
-  isolation: isolate;
   flex: 0 0 auto;
-  display: grid;
-  grid-template-columns: 1fr 1.2fr 1fr;
-  align-items: center;
-  gap: 16px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 24px;
   width: min(900px, 92vw);
   margin: 16px auto 0;
   padding: 14px 24px;
-  background: #3d5966;
+  background: rgba(0, 0, 0, 0.18);
   border-radius: 12px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
 
-.game-stat { min-width: 0; }
-
-.stat-label {
-  display: block;
-  margin-bottom: 3px;
-  color: #91aab3;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.game-stat strong {
-  display: block;
-  color: #fff;
-  font-size: 20px;
-  line-height: 1.15;
-  font-weight: 700;
-}
-
 #calm-heading {
+  font-size: 24px;
+  font-weight: 800;
   color: #ffd166;
-  font-size: 27px;
-  font-weight: 850;
+  text-align: left;
 }
 
-#round-stat { text-align: center; }
-#round-details {
-  display: block;
-  margin-top: 3px;
-  color: #a8bdc4;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-#disturbances-stat { text-align: right; }
-#away-stat { color: #dce8ec; font-size: 17px; }
-#round-heading { font-size: 22px; }
-
-@media (max-width: 600px) {
-  #site-header { padding-top: 62px; }
-  #stats-bar { grid-template-columns: 1fr 1fr 1fr; gap: 4px 8px; width: 96vw; padding: 8px 10px; }
-  #calm-stat { grid-column: 1; grid-row: 1; }
-  #disturbances-stat { grid-column: 3; grid-row: 1; }
-  #round-stat { grid-column: 1 / -1; grid-row: 2; }
-  .stat-label { font-size: 9px; letter-spacing: 0.08em; }
-  .game-stat strong { font-size: 16px; }
-  #calm-heading { font-size: 20px; }
-  #round-heading { font-size: 18px; }
-  #round-details { font-size: 10px; }
-  #away-stat { font-size: 13px; }
-}
-
-@media (max-width: 380px) {
-  #stats-bar { width: 98vw; padding-right: 6px; padding-left: 6px; }
-  #round-heading { font-size: 16px; }
-  #round-details { font-size: 9px; }
+#away-stat {
+  font-size: 14px;
+  color: #9fb4bd;
+  text-align: right;
 }
 
 #game-wrap {
@@ -159,7 +113,7 @@ body {
 #game-area {
   position: relative;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   max-width: 100%;
   max-height: 100%;
@@ -190,12 +144,12 @@ body {
 .hud-panel-side {
   position: absolute;
   left: 100%;
-  top: 0;
-  transform: none;
+  top: 50%;
+  transform: translateY(-50%);
   margin-left: 24px;
-  width: 312px;
-  max-width: 312px;
-  min-width: 312px;
+  width: 260px;
+  max-width: 260px;
+  min-width: 260px;
   background: rgba(20, 30, 35, 0.88);
   color: #fff;
   padding: 18px 20px 20px;
@@ -203,119 +157,13 @@ body {
   text-align: center;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
   overflow-wrap: break-word;
-  max-height: none;
-  overflow: visible;
 }
-
-#round-hud {
-  box-sizing: border-box;
-  max-height: none;
-  overflow: visible;
-}
-
-#round-hud h2 {
-  margin: 0 0 8px;
-  color: #ffd166;
-  font-size: 20px;
-}
-
-#round-hud p {
-  margin: 7px 0;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-#round-currency {
-  color: #ffd166;
-  font-weight: 700;
-}
-
-#upgrade-list {
-  display: grid;
-  gap: 7px;
-  margin: 12px 0;
-  text-align: left;
-}
-
-.upgrade-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  justify-content: space-between;
-  gap: 7px;
-  padding: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.06);
-  font-size: 12px;
-}
-
-.upgrade-item strong { color: #fff; }
-.upgrade-title-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.upgrade-title-line strong { min-width: 0; }
-.upgrade-state { flex: 0 0 auto; font-size: 11px; font-weight: 700; white-space: nowrap; }
-.upgrade-state-locked { color: #d3a5b1; text-decoration: underline dotted; text-underline-offset: 2px; cursor: help; }
-.upgrade-state-unaffordable { color: #c0d48b; text-decoration: underline dotted; text-underline-offset: 2px; cursor: help; }
-.upgrade-state-ready { color: #ffd166; }
-.upgrade-item small {
-  display: block;
-  margin-top: 3px;
-  color: #b8c7cb;
-  line-height: 1.25;
-}
-
-.upgrade-item button,
-#next-round-btn {
-  flex: 0 0 auto;
-  border: 0;
-  border-radius: 6px;
-  padding: 7px 9px;
-  background: #4caf7d;
-  color: #10251a;
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.upgrade-item button:disabled {
-  background: #52636a;
-  color: #a9b4b8;
-  cursor: default;
-}
-
-.upgrade-item.upgrade-locked { border-color: rgba(255, 255, 255, 0.1); }
-.upgrade-item.upgrade-ready { border-color: rgba(255, 209, 102, 0.72); }
-.upgrade-item.upgrade-prerequisite-locked { background: rgba(90, 68, 78, 0.32); }
-.upgrade-item.upgrade-unaffordable { background: rgba(70, 77, 59, 0.32); }
-.upgrade-item.upgrade-complete { opacity: 0.68; }
-.upgrade-item.upgrade-complete span { margin-left: 8px; color: #b8c7cb; font-size: 11px; }
-
-.upgrade-target-label {
-  display: block;
-  margin-top: 6px;
-  color: #ffd166;
-  font-size: 11px;
-}
-
-.upgrade-target {
-  max-width: 100%;
-  margin-left: 4px;
-  padding: 3px 5px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 4px;
-  background: #263840;
-  color: #fff;
-  font: inherit;
-}
-
-#next-round-btn { width: 100%; margin-top: 3px; }
 
 @media (max-width: 880px) {
   /* No room to offset the panel to the side on a narrow screen - drop
      it back into normal flow, stacked below the canvas. */
   #game-area {
     flex-direction: column;
-    align-items: center;
   }
   .hud-panel-side {
     position: static;
@@ -323,8 +171,8 @@ body {
     top: auto;
     transform: none;
     margin: 16px 0 0;
-    width: min(672px, 92vw);
-    max-width: min(672px, 92vw);
+    width: min(560px, 92vw);
+    max-width: min(560px, 92vw);
     min-width: 0;
   }
 }
@@ -530,13 +378,6 @@ body {
   margin: 0;
 }
 
-.score-upgrades {
-  display: inline-block;
-  margin: 0 0 6px;
-  padding-left: 22px;
-  text-align: left;
-}
-
 .score-line {
   font-size: 19px !important;
   color: #ffd166 !important;
@@ -653,8 +494,7 @@ body {
   #game-wrap {
     flex: 1 1 0;
     min-height: 0;
-    overflow-x: hidden;
-    overflow-y: auto;
+    overflow: hidden;
     padding: clamp(8px, 2vh, 16px) 16px;
   }
   #game-row {

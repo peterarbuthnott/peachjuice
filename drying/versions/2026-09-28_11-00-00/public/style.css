@@ -56,9 +56,6 @@ body {
 
 /* Persistent game header: calm at left, round status centred, disturbances at right. */
 #stats-bar {
-  position: relative;
-  z-index: 2;
-  isolation: isolate;
   flex: 0 0 auto;
   display: grid;
   grid-template-columns: 1fr 1.2fr 1fr;
@@ -67,7 +64,7 @@ body {
   width: min(900px, 92vw);
   margin: 16px auto 0;
   padding: 14px 24px;
-  background: #3d5966;
+  background: rgba(0, 0, 0, 0.18);
   border-radius: 12px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
 }
@@ -288,7 +285,7 @@ body {
 .upgrade-item.upgrade-prerequisite-locked { background: rgba(90, 68, 78, 0.32); }
 .upgrade-item.upgrade-unaffordable { background: rgba(70, 77, 59, 0.32); }
 .upgrade-item.upgrade-complete { opacity: 0.68; }
-.upgrade-item.upgrade-complete span { margin-left: 8px; color: #b8c7cb; font-size: 11px; }
+.upgrade-item.upgrade-complete span { color: #b8c7cb; font-size: 11px; }
 
 .upgrade-target-label {
   display: block;
