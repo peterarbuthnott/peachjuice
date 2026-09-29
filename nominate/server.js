@@ -190,13 +190,16 @@ var MIME_TYPES = {
 };
 
 function serveStaticFile(res, filePath) {
+  var ext = path.extname(filePath).toLowerCase();
+  var minFilePath = filePath.slice(0, -ext.length) + '.min' + ext;
+  if ((ext === '.html' || ext === '.js' || ext === '.css') && fs.existsSync(minFilePath)) filePath = minFilePath;
   fs.readFile(filePath, function (err, data) {
     if (err) {
       sendError(res, 404, 'Not found');
       return;
     }
-    var ext = path.extname(filePath).toLowerCase();
-    res.writeHead(200, { 'Content-Type': MIME_TYPES[ext] || 'application/octet-stream' });
+    var servedExt = path.extname(filePath).toLowerCase();
+    res.writeHead(200, { 'Content-Type': MIME_TYPES[servedExt] || 'application/octet-stream' });
     res.end(data);
   });
 }

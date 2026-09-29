@@ -48,8 +48,9 @@ body {
 
 .top-nav {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  gap: 20px;
+  gap: 8px 16px;
   margin-top: 14px;
 }
 

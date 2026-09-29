@@ -337,6 +337,9 @@ button, select, input {
   text-decoration: none;
   margin: -8px 0 16px;
 }
+.site-guide-links { display:flex; flex-wrap:wrap; gap:4px 10px; margin:-8px 0 16px; font-size:10px; }
+.site-guide-links a { color:var(--text-40); text-decoration:none; }
+.site-guide-links a:hover { color:var(--gold); }
 .site-exit-link .icon { width: 11px; height: 11px; }
 .site-exit-link:hover { color: var(--gold); }
 

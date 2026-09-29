@@ -183,6 +183,8 @@ export function renderHomeView(container, { onStartNewGame, onResumeGame }) {
 
         <a href="https://www.andisdad.net/" class="site-exit-link">${icon('home')} Leave Nominate — back to andisdad.net</a>
 
+        <nav class="site-guide-links" aria-label="Nominate guides"><a href="about.html">About</a> <span aria-hidden="true">·</span> <a href="hints.html">Hints and tips</a> <span aria-hidden="true">·</span> <a href="highscores-info.html">Highscores</a> <span aria-hidden="true">·</span> <a href="ideas.html">New ideas</a></nav>
+
         <div class="info-grid">
           <div class="info-cell">
             <div class="label">Local State</div>

@@ -42,6 +42,11 @@ html, body {
   background: rgba(0, 0, 0, 0.15);
 }
 
+.footer-guide-links a { color: inherit; text-decoration: underline; }
+
+.skyscraper-ad:first-child { margin-right: 150px; }
+.skyscraper-ad:last-child { margin-left: 150px; }
+
 /* Below this width, showing 160px-wide ad columns on both sides would
    crowd out the game itself - hide them and let #game-wrap's flex:1 take
    the full width instead, same as if the ads weren't there at all. */
@@ -134,7 +139,7 @@ html, body {
   width: 300px;
   max-width: 100%;
   max-height: min(250px, 26dvh);
-  margin: clamp(2px, 0.7vh, 6px) auto clamp(4px, 1vh, 10px);
+  margin: 150px auto 10px;
   overflow: hidden;
 }
 

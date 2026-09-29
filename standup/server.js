@@ -149,13 +149,16 @@ function serveStatic(req, res, pathname) {
     return res.end('Forbidden');
   }
 
+  var ext = path.extname(filePath).toLowerCase();
+  var minFilePath = filePath.slice(0, -ext.length) + '.min' + ext;
+  if ((ext === '.html' || ext === '.js' || ext === '.css') && fs.existsSync(minFilePath)) filePath = minFilePath;
   fs.readFile(filePath, function (err, content) {
     if (err) {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       return res.end('Not found');
     }
-    var ext = path.extname(filePath);
-    res.writeHead(200, { 'Content-Type': CONTENT_TYPES[ext] || 'application/octet-stream' });
+    var servedExt = path.extname(filePath).toLowerCase();
+    res.writeHead(200, { 'Content-Type': CONTENT_TYPES[servedExt] || 'application/octet-stream' });
     res.end(content);
   });
 }

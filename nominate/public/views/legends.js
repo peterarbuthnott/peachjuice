@@ -85,6 +85,8 @@ export function renderLegendsView(container) {
 
         <a href="https://www.andisdad.net/" class="site-exit-link">${icon('home')} Leave Nominate — back to andisdad.net</a>
 
+        <nav class="site-guide-links" aria-label="Nominate guides"><a href="about.html">About</a> <span aria-hidden="true">·</span> <a href="hints.html">Hints and tips</a> <span aria-hidden="true">·</span> <a href="highscores-info.html">Highscores</a> <span aria-hidden="true">·</span> <a href="ideas.html">New ideas</a></nav>
+
         <h3 class="section-title">${icon('trophy')} Ranked by Wins, then Score</h3>
 
         ${body}

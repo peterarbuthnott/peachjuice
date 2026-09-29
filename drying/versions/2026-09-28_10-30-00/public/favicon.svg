@@ -1,0 +1,26 @@
+<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="paintedHalf">
+      <rect x="4" y="4" width="27" height="56" />
+    </clipPath>
+  </defs>
+
+  <!-- unpainted (primer) half of the wall -->
+  <rect x="4" y="4" width="56" height="56" rx="4" fill="#d9d2c2" stroke="#cfe8ff" stroke-width="1.5" />
+
+  <!-- painted half, clipped to the left side -->
+  <g clip-path="url(#paintedHalf)">
+    <rect x="4" y="4" width="56" height="56" fill="#8ea482" />
+    <rect x="4" y="4" width="56" height="56" fill="rgba(0,0,0,0.12)" />
+  </g>
+
+  <!-- skirting board -->
+  <rect x="4" y="52" width="56" height="8" fill="#7c5a3a" />
+
+  <!-- paintbrush, dragging across the boundary between the two halves -->
+  <g transform="translate(34,20) rotate(35)">
+    <rect x="-4" y="-14" width="8" height="16" rx="1.5" fill="#c9a227" stroke="#8a6b1f" stroke-width="1" />
+    <rect x="-6" y="2" width="12" height="10" rx="2" fill="#e8dcc0" stroke="#8a6b1f" stroke-width="1" />
+    <rect x="-5.5" y="10" width="11" height="5" rx="1.5" fill="#f2efe4" />
+  </g>
+</svg>

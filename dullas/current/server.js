@@ -187,6 +187,7 @@ var MIME_TYPES = {
   '.css': 'text/css; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.svg': 'image/svg+xml',
@@ -212,14 +213,17 @@ function serveStatic(req, res) {
     res.end('Forbidden');
     return;
   }
+  var ext = path.extname(filePath).toLowerCase();
+  var minFilePath = filePath.slice(0, -ext.length) + '.min' + ext;
+  if ((ext === '.html' || ext === '.js' || ext === '.css') && fs.existsSync(minFilePath)) filePath = minFilePath;
   fs.readFile(filePath, function (err, data) {
     if (err) {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       res.end('Not found');
       return;
     }
-    var ext = path.extname(filePath).toLowerCase();
-    res.writeHead(200, { 'Content-Type': MIME_TYPES[ext] || 'application/octet-stream' });
+    var servedExt = path.extname(filePath).toLowerCase();
+    res.writeHead(200, { 'Content-Type': MIME_TYPES[servedExt] || 'application/octet-stream' });
     res.end(data);
   });
 }
