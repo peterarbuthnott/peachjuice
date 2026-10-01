@@ -64,64 +64,6 @@ const roundHeading = document.getElementById('round-heading');
 const roundDetails = document.getElementById('round-details');
 const awayStat = document.getElementById('away-stat');
 const sidePanel = document.getElementById('side-panel');
-
-// The play area fills the whole screen height under the stats bar: the wall
-// canvas is sized to the largest 3:2 box that fits #game-row. The paint /
-// drying panel is an overlay across the floor strip at the bottom of it.
-const gameRowEl = document.getElementById('game-row');
-function fitCanvas() {
-  const w = gameRowEl.clientWidth;
-  const h = gameRowEl.clientHeight;
-  if (!w || !h) return;
-  const s = Math.min(w / CANVAS_W, h / CANVAS_H);
-  canvas.style.width = Math.floor(CANVAS_W * s) + 'px';
-  canvas.style.height = Math.floor(CANVAS_H * s) + 'px';
-}
-window.addEventListener('resize', fitCanvas);
-window.addEventListener('orientationchange', fitCanvas);
-if (window.ResizeObserver) new ResizeObserver(fitCanvas).observe(gameRowEl);
-fitCanvas();
-
-// ROUND SHEET - at the end of a round the panel "scrolls" up from its spot
-// over the floor to cover the whole screen; "Start next wall" scrolls it back.
-const SHEET_MS = 600;
-let sheetCollapsedHeight = 0;
-function sheetTransition() {
-  return ['top', 'left', 'width', 'height', 'border-radius'].map((p) => `${p} ${SHEET_MS}ms ease`).join(', ');
-}
-function openRoundSheet(swapContent) {
-  const r = sidePanel.getBoundingClientRect();
-  sheetCollapsedHeight = r.height;
-  sidePanel.style.transition = 'none';
-  Object.assign(sidePanel.style, { position: 'fixed', left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px', right: 'auto', bottom: 'auto', margin: '0' });
-  sidePanel.classList.add('sheet');
-  swapContent(); // round-complete content replaces the drying content
-  // Grow upward (bottom edge stays put) only as far as needed to show the
-  // whole box including the Start next wall button - capped to the screen.
-  const needed = sidePanel.scrollHeight;
-  const maxH = Math.max(r.height, r.bottom - 4);
-  const targetH = Math.min(Math.max(needed, r.height), maxH);
-  void sidePanel.offsetHeight;
-  sidePanel.style.transition = sheetTransition();
-  Object.assign(sidePanel.style, { top: (r.bottom - targetH) + 'px', height: targetH + 'px' });
-  setTimeout(() => sidePanel.classList.add('sheet-open'), SHEET_MS);
-}
-function clearSheetStyles() {
-  sidePanel.classList.remove('sheet', 'sheet-open');
-  ['transition', 'position', 'left', 'top', 'width', 'height', 'right', 'bottom', 'margin'].forEach((p) => { sidePanel.style[p] = ''; });
-}
-function closeRoundSheet(done) {
-  const cr = canvas.getBoundingClientRect();
-  const h = sheetCollapsedHeight || 80;
-  sidePanel.classList.remove('sheet-open');
-  sidePanel.scrollTop = 0;
-  sidePanel.style.transition = sheetTransition();
-  Object.assign(sidePanel.style, {
-    height: h + 'px',
-    top: (cr.bottom - cr.height * 0.015 - h) + 'px',
-  });
-  setTimeout(() => { clearSheetStyles(); done(); }, SHEET_MS + 30);
-}
 const paintHud = document.getElementById('paint-hud');
 const dryingHud = document.getElementById('drying-hud');
 const coverageLabel = document.getElementById('coverage-label');
@@ -191,10 +133,10 @@ const PAINT_TIME_BONUS = 10; // Moments of calm awarded for finishing the paint 
 const MAX_ROUNDS = 10;
 const UPGRADES = [
   { id: 'brush', name: 'Bigger brush', max: 5, costForLevel: (level) => 50 * Math.pow(2, level - 1), description: 'A bigger brush makes painting the wall quicker.' },
-  { id: 'eyes', name: 'Extra Eyes', max: 5, costForLevel: (level) => 100 * Math.pow(2, level - 1), description: 'Adds one eye pair, at another corner of the hexagon around your finger/pointer. Up to six pairs can earn calm.' },
-  { id: 'specs', name: 'Specs', max: 6, costForLevel: () => 200, description: 'Put glasses on an eye pair for x2 return, or x20 with Goldeneyes.' },
-  { id: 'goldEyes', name: 'Goldeneyes', max: 6, costForLevel: (level) => 500 * Math.pow(2, level - 1), description: 'Make an eye pair golden for x10 return, or x20 with Specs.' },
-  { id: 'goldSpecs', name: 'Magpeye · Golden Specs', max: 6, costForLevel: () => 1000, description: 'Upgrade one pair of Specs for x5 return, or x50 with Goldeneyes.' },
+  { id: 'eyes', name: 'More Eyes', max: 5, costForLevel: (level) => 100 * Math.pow(2, level - 1), description: 'Adds one eye pair, at another corner of the hexagon around your finger/pointer. Up to six pairs can earn calm.' },
+  { id: 'specs', name: 'Specs', max: 6, costForLevel: () => 200, description: 'Put glasses on an eye pair for x2 return, or x20 with Golden Eyes.' },
+  { id: 'goldEyes', name: 'Golden Eyes', max: 6, costForLevel: (level) => 500 * Math.pow(2, level - 1), description: 'Make an eye pair golden for x10 return, or x20 with Specs.' },
+  { id: 'goldSpecs', name: 'Magpeye · Golden Specs', max: 6, costForLevel: () => 200, description: 'Upgrade one pair of Specs for x5 return, or x50 with Golden Eyes.' },
 ];
 
 function upgradeMaxLevel(def) {
@@ -227,33 +169,20 @@ function totalEyeMultiplier() {
 // The hexagon is HEX_WIDTH_CSS_PX wide on screen (about the width of the
 // "Play now" button, and comfortably wider than a fingertip), converted to
 // canvas units so it stays the same physical size when the canvas is scaled.
-const HEX_WIDTH_CSS_PX = 140;
-// DEBUG: while true, a new game starts with all six eye pairs showing each
-// look (plain, specs, goldeneyes, goldeneyes+specs, golden specs, goldeneyes+golden specs).
-// Set to false for the normal single plain pair.
-const DEBUG_SHOW_ALL_EYE_STYLES = false;
-function startingEyeSets() {
-  if (!DEBUG_SHOW_ALL_EYE_STYLES) return [{ specs: false, goldenEyes: false, goldSpecs: false }];
-  return [
-    { specs: false, goldenEyes: false, goldSpecs: false }, // 1 plain
-    { specs: true,  goldenEyes: false, goldSpecs: false }, // 2 glasses
-    { specs: false, goldenEyes: true,  goldSpecs: false }, // 3 goldeneyes
-    { specs: true,  goldenEyes: true,  goldSpecs: false }, // 4 goldeneyes + glasses
-    { specs: true,  goldenEyes: false, goldSpecs: true  }, // 5 golden glasses
-    { specs: true,  goldenEyes: true,  goldSpecs: true  }, // 6 goldeneyes + golden glasses
-  ];
-}
-const PLAIN_EYE_GAP = 8.2;
-const EYE_R = 6.2; // round eyes
-const SPECS_EYE_GAP = 10.6; // half-distance between eye centres when wearing specs (lenses stay clear of each other)
-const EYE_SCALE = 1.6; // eyes are drawn (and hit-tested) at 1.6x their base size
+const HEX_WIDTH_CSS_PX = 200;
 // Vertex k is at angle 60k degrees: 0 = right, 1 = lower-right, 2 = lower-left,
 // 3 = left, 4 = upper-left, 5 = upper-right.
-// Fixed slot for each eye pair, so adding a pair never moves existing ones:
-//        eyes1  eyes2
-//   eyes3              eyes4
-//        eyes5  eyes6
-const HEX_PAIR_VERTEX = [4, 5, 3, 0, 2, 1];
+// Which vertices are used for 1..6 pairs (upper ones first as a finger
+// covers what is below it; the sets are kept as balanced as possible).
+const HEX_VERTEX_SETS = [
+  [],
+  [4],
+  [4, 5],
+  [0, 2, 4],
+  [1, 2, 4, 5],
+  [1, 2, 3, 4, 5],
+  [0, 1, 2, 3, 4, 5],
+];
 
 function hexRadius() {
   const rect = canvas.getBoundingClientRect();
@@ -262,7 +191,8 @@ function hexRadius() {
 }
 
 function eyePairOffset(index, count) {
-  const angle = (Math.PI / 3) * HEX_PAIR_VERTEX[index % HEX_PAIR_VERTEX.length];
+  const set = HEX_VERTEX_SETS[Math.min(count, 6)] || HEX_VERTEX_SETS[6];
+  const angle = (Math.PI / 3) * set[index % set.length];
   const r = hexRadius();
   return { x: Math.cos(angle) * r, y: Math.sin(angle) * r };
 }
@@ -270,8 +200,8 @@ function eyePairOffset(index, count) {
 function eyePairOnScreen(index, x, y) {
   const offset = eyePairOffset(index, eyePairCount());
   const set = state.eyeSetUpgrades[index];
-  const halfWidth = (set.specs ? 23 : 16) * EYE_SCALE;
-  const halfHeight = (set.specs ? 14 : 11) * EYE_SCALE;
+  const halfWidth = set.specs ? 21 : 16;
+  const halfHeight = set.specs ? 14 : 11;
   const px = x + offset.x;
   const py = y + offset.y;
   return px - halfWidth >= 0 && px + halfWidth <= CANVAS_W && py - halfHeight >= 0 && py + halfHeight <= CANVAS_H;
@@ -285,8 +215,7 @@ function countingEyePairsAt(x, y) {
     const offset = eyePairOffset(index, eyePairCount());
     const px = x + offset.x;
     const py = y + offset.y;
-    const gap = (state.eyeSetUpgrades[index].specs ? SPECS_EYE_GAP : PLAIN_EYE_GAP) * EYE_SCALE;
-    if (isPaintable(px - gap, py) && isPaintable(px + gap, py)) eligible.push(index);
+    if (isPaintable(px - 8.5, py) && isPaintable(px + 8.5, py)) eligible.push(index);
   }
   return eligible;
 }
@@ -515,7 +444,7 @@ const state = {
   calmSpent: 0,
   totalMomentsOfCalmEarned: 0,
   upgrades: { brush: 0, eyes: 0, specs: 0, goldEyes: 0, goldSpecs: 0 },
-  eyeSetUpgrades: startingEyeSets(),
+  eyeSetUpgrades: [{ specs: false, goldenEyes: false, goldSpecs: false }],
   totalWatchedMs: 0,
   totalAwayMs: 0,
   totalLookAwayCount: 0,
@@ -530,7 +459,7 @@ const state = {
   wallFilledAt100: false,
 
   eyeBlinks: Array.from({ length: 6 }, () => ({ nextAt: null, until: 0 })), // each eye set has an independent blink schedule
-  eyeSetWatchedMs: startingEyeSets().map(() => 0),
+  eyeSetWatchedMs: [0],
 };
 
 // Roughly every 5 seconds, plus or minus up to 2 seconds - see
@@ -1326,97 +1255,59 @@ function drawEyesCursor(x, y, now) {
   ctx.fill();
   for (let set = 0; set < pairCount; set++) {
     const offset = eyePairOffset(set, pairCount);
-    // Draw each pair at its hexagon vertex, scaled up by EYE_SCALE.
-    ctx.save();
-    ctx.translate(x + offset.x, y + offset.y);
-    ctx.scale(EYE_SCALE, EYE_SCALE);
-    const centerX = 0;
-    const centerY = 0;
+    const centerX = x + offset.x;
+    const centerY = y + offset.y;
     const eyeSet = state.eyeSetUpgrades[set];
     const golden = eyeSet.goldenEyes;
     const hasSpecs = eyeSet.specs;
     const goldenSpecs = eyeSet.goldSpecs;
     const frameColor = goldenSpecs ? '#e7b93f' : '#252525';
-    const eyeGap = hasSpecs ? SPECS_EYE_GAP : PLAIN_EYE_GAP; // eyes sit further apart inside glasses
-    const eyeOffsets = [-eyeGap, eyeGap];
+    const eyeOffsets = [-8.5, 8.5];
     const blink = !eligiblePairs.includes(set) || now < state.eyeBlinks[set].until;
-    const ink = '#1d1d1d';
-    // Round eyes (matching the reference icon): white disc, bold outline,
-    // large round pupil with a small white highlight.
     eyeOffsets.forEach((offset) => {
       const dx = centerX + offset;
-      const dy = centerY + 0.4;
+      ctx.beginPath();
       if (blink) {
-        ctx.beginPath();
-        ctx.strokeStyle = ink;
-        ctx.lineWidth = 2.2;
-        ctx.lineCap = 'round';
-        ctx.moveTo(dx - EYE_R + 0.5, dy);
-        ctx.quadraticCurveTo(dx, dy + 3.5, dx + EYE_R - 0.5, dy);
+        ctx.strokeStyle = goldenSpecs ? frameColor : '#252525';
+        ctx.lineWidth = 2.5;
+        ctx.moveTo(dx - 6, centerY);
+        ctx.quadraticCurveTo(dx, centerY + 3, dx + 6, centerY);
         ctx.stroke();
       } else {
-        ctx.beginPath();
-        ctx.arc(dx, dy, EYE_R, 0, Math.PI * 2);
+        ctx.ellipse(dx, centerY, 6, 9, 0, 0, Math.PI * 2);
         ctx.fillStyle = '#ffffff';
         ctx.fill();
-        ctx.lineWidth = 1 / EYE_SCALE; // 1px on screen
-        ctx.strokeStyle = ink;
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = '#252525';
         ctx.stroke();
         ctx.beginPath();
-        ctx.arc(dx, dy + 0.2, EYE_R * 0.58, 0, Math.PI * 2);
-        ctx.fillStyle = golden ? '#d5a51e' : '#141414';
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(dx - EYE_R * 0.2, dy - EYE_R * 0.22, EYE_R * 0.17, 0, Math.PI * 2);
-        ctx.fillStyle = '#ffffff';
+        ctx.arc(dx, centerY, 3, 0, Math.PI * 2);
+        ctx.fillStyle = golden ? '#d5a51e' : '#2a2a2a';
         ctx.fill();
       }
     });
     if (hasSpecs) {
-      // Glasses modelled on the reference icon: two wide, well-rounded
-      // lenses with a heavy top rim, medium sides and a slimmer bottom
-      // rim; a curved bridge between them (the lenses themselves never
-      // touch) and short arm stubs at the outer top corners.
-      const OUT_HW = 9.4, OUT_HH = 9.8, OUT_R = 6.4;
-      const IN_L = 1.9, IN_R = 1.9, IN_T = 3.0, IN_B = 1.7, IN_RAD = 4.6;
-      const roundedRect = (x0, y0, x1, y1, rad) => {
-        ctx.moveTo(x0 + rad, y0);
-        ctx.lineTo(x1 - rad, y0);
-        ctx.arcTo(x1, y0, x1, y0 + rad, rad);
-        ctx.lineTo(x1, y1 - rad);
-        ctx.arcTo(x1, y1, x1 - rad, y1, rad);
-        ctx.lineTo(x0 + rad, y1);
-        ctx.arcTo(x0, y1, x0, y1 - rad, rad);
-        ctx.lineTo(x0, y0 + rad);
-        ctx.arcTo(x0, y0, x0 + rad, y0, rad);
-        ctx.closePath();
-      };
-      ctx.fillStyle = frameColor;
-      ctx.strokeStyle = frameColor;
-      [-eyeGap, eyeGap].forEach((lensOffset) => {
-        const cx = centerX + lensOffset;
+      [-10, 10].forEach((lensOffset) => {
+        const lensX = centerX + lensOffset;
+        ctx.strokeStyle = frameColor;
+        ctx.lineWidth = 3;
+        ctx.lineJoin = 'round';
         ctx.beginPath();
-        roundedRect(cx - OUT_HW, centerY - OUT_HH, cx + OUT_HW, centerY + OUT_HH, OUT_R);
-        roundedRect(cx - OUT_HW + IN_L, centerY - OUT_HH + IN_T, cx + OUT_HW - IN_R, centerY + OUT_HH - IN_B, IN_RAD);
-        ctx.fill('evenodd');
+        ctx.moveTo(lensX - 6, centerY - 11); ctx.lineTo(lensX + 6, centerY - 11);
+        ctx.quadraticCurveTo(lensX + 9, centerY - 11, lensX + 9, centerY - 8);
+        ctx.lineTo(lensX + 9, centerY + 8); ctx.quadraticCurveTo(lensX + 9, centerY + 11, lensX + 6, centerY + 11);
+        ctx.lineTo(lensX - 6, centerY + 11); ctx.quadraticCurveTo(lensX - 9, centerY + 11, lensX - 9, centerY + 8);
+        ctx.lineTo(lensX - 9, centerY - 8); ctx.quadraticCurveTo(lensX - 9, centerY - 11, lensX - 6, centerY - 11);
+        ctx.closePath(); ctx.stroke();
       });
-      // Bridge: curved arch joining the two top-inner rims.
-      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.moveTo(centerX - 2, centerY - 3);
+      ctx.quadraticCurveTo(centerX, centerY - 5, centerX + 2, centerY - 3);
+      ctx.strokeStyle = frameColor;
+      ctx.lineWidth = 3;
       ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(centerX - (eyeGap - OUT_HW) - 0.4, centerY - 4.2);
-      ctx.quadraticCurveTo(centerX, centerY - 7.2, centerX + (eyeGap - OUT_HW) + 0.4, centerY - 4.2);
-      ctx.stroke();
-      // Arm stubs
-      ctx.lineWidth = 2.4;
-      ctx.beginPath();
-      ctx.moveTo(centerX - eyeGap - OUT_HW + 0.5, centerY - 6);
-      ctx.lineTo(centerX - eyeGap - OUT_HW - 1.8, centerY - 7);
-      ctx.moveTo(centerX + eyeGap + OUT_HW - 0.5, centerY - 6);
-      ctx.lineTo(centerX + eyeGap + OUT_HW + 1.8, centerY - 7);
       ctx.stroke();
     }
-    ctx.restore();
   }
   ctx.restore();
 }
@@ -1530,7 +1421,7 @@ function tick(now) {
     } else if (watching !== state.wasWatching) {
       if (!watching) {
         state.lookAwayCount++;
-        // Look-aways cost a flat 5 calm, independent of the Extra Eyes
+        // Look-aways cost a flat 5 calm, independent of the More Eyes
         // multiplier applied to each watched second.
         awayBanner.classList.remove('hidden');
       } else {
@@ -1629,11 +1520,11 @@ function finishDrying() {
     ? 'Fast finish! Your time bonus is included in your Moments of calm.'
     : `The next wall gives you less time to paint. Drying still takes ${formatMinSec(DRY_DURATION_MS)}.`;
   renderUpgradeList();
-  openRoundSheet(() => { // measures the collapsed panel BEFORE swapping its content
-    dryingHud.classList.add('hidden');
-    roundHud.classList.remove('hidden');
-    roundHud.scrollTop = 0;
-  });
+  roundHud.style.minHeight = `${Math.round(dryingHud.getBoundingClientRect().height)}px`;
+  roundHud.style.height = 'auto';
+  roundHud.scrollTop = 0;
+  dryingHud.classList.add('hidden');
+  roundHud.classList.remove('hidden');
 }
 
 function renderUpgradeList() {
@@ -1657,8 +1548,8 @@ function renderUpgradeList() {
     if (u.id === 'brush') details = `Next: 20% bigger brush · ${cost} Moments of calm`;
     if (u.id === 'eyes') details = `Next: add an eye pair · ${cost} Moments of calm`;
     if (u.id === 'specs') details = `Next: add Specs to an eye pair · double return · ${cost} Moments of calm`;
-    if (u.id === 'goldEyes') details = `Next: Goldeneyes · 10× return (20× with Specs) · ${cost} Moments of calm`;
-    if (u.id === 'goldSpecs') details = `Next: Golden Specs · 5× return (50× with Goldeneyes) · ${cost} Moments of calm`;
+    if (u.id === 'goldEyes') details = `Next: Golden Eyes · 10× return (20× with Specs) · ${cost} Moments of calm`;
+    if (u.id === 'goldSpecs') details = `Next: Golden Specs · 5× return (50× with Golden Eyes) · ${cost} Moments of calm`;
     const targets = upgradeTargets(u);
     const targetPicker = canBuy && targets.length
       ? `<label class="upgrade-target-label">Eye pair <select class="upgrade-target" data-target-for="${u.id}" data-level="${level}">${targets.map((target) => `<option value="${target}">#${target + 1}</option>`).join('')}</select></label>`
@@ -1728,14 +1619,7 @@ function startRound(round) {
   startCoverageSampling();
 }
 
-nextRoundBtn.addEventListener('click', () => {
-  if (nextRoundBtn.disabled) return;
-  nextRoundBtn.disabled = true;
-  closeRoundSheet(() => {
-    nextRoundBtn.disabled = false;
-    startRound(state.round + 1);
-  });
-});
+nextRoundBtn.addEventListener('click', () => startRound(state.round + 1));
 
 // ----------------------------------------------------------------------------
 // Screen transitions
@@ -1766,7 +1650,6 @@ function initColorSwatches() {
 startPaintingBtn.addEventListener('click', () => {
   if (!state.selectedColor) return;
   splashScreen.classList.add('fading-out');
-  document.body.classList.add('in-game'); // hides the site header while playing
   setTimeout(() => splashScreen.classList.add('hidden'), 350);
   sidePanel.classList.remove('hidden');
   paintHud.classList.remove('hidden');
@@ -1829,7 +1712,7 @@ function resetToSplash() {
   state.calmSpent = 0;
   state.totalMomentsOfCalmEarned = 0;
   state.upgrades = { brush: 0, eyes: 0, specs: 0, goldEyes: 0, goldSpecs: 0 };
-  state.eyeSetUpgrades = startingEyeSets();
+  state.eyeSetUpgrades = [{ specs: false, goldenEyes: false, goldSpecs: false }];
   state.totalWatchedMs = 0;
   state.totalAwayMs = 0;
   state.totalLookAwayCount = 0;
@@ -1847,7 +1730,7 @@ function resetToSplash() {
   state.lastMouse = null;
   state.paintBonusAwarded = false;
   state.eyeBlinks = Array.from({ length: 6 }, () => ({ nextAt: null, until: 0 }));
-  state.eyeSetWatchedMs = state.eyeSetUpgrades.map(() => 0);
+  state.eyeSetWatchedMs = [0];
   captionIndex = 0;
   resetWall();
   stopCaptionRotation();
@@ -1864,10 +1747,8 @@ function resetToSplash() {
   paintHud.classList.remove('hidden');
   dryingHud.classList.add('hidden');
   roundHud.classList.add('hidden');
-  clearSheetStyles();
   splashScreen.classList.remove('hidden');
   splashScreen.classList.remove('fading-out');
-  document.body.classList.remove('in-game');
 
   ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
   renderCanvas();

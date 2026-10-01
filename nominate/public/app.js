@@ -37,7 +37,13 @@ function showLoadingError(message) {
   `;
 }
 
+function setPlay(on) {
+  if (on) document.documentElement.setAttribute('data-pj-play', '1');
+  else document.documentElement.removeAttribute('data-pj-play');
+}
+
 function showHome() {
+  setPlay(false);
   currentGame = null;
   root.innerHTML = '';
   renderHomeView(root, {
@@ -47,6 +53,7 @@ function showHome() {
 }
 
 function showNaming(game) {
+  setPlay(true);
   root.innerHTML = '';
   renderNamingView(root, game, {
     onConfirmNames: handleConfirmNames,
@@ -55,6 +62,7 @@ function showNaming(game) {
 }
 
 function showScoring(game) {
+  setPlay(true);
   root.innerHTML = '';
   renderScoringView(root, game, {
     onUpdateGame: handleUpdateGame,
@@ -63,6 +71,7 @@ function showScoring(game) {
 }
 
 function showResults(game) {
+  setPlay(true);
   root.innerHTML = '';
   renderResultsView(root, game, {
     onRestart: showHome,

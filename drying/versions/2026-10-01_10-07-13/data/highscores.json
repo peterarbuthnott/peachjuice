@@ -1,0 +1,15 @@
+[
+  {
+    "playerId": "f038dafe-71ae-421b-814e-cece2c7141fb",
+    "name": "bob",
+    "colorName": "Duck Egg",
+    "coveragePercent": 100,
+    "momentsOfCalm": 20970,
+    "paintBonusAwarded": true,
+    "totalElapsedMs": 1102906,
+    "watchedMs": 890633,
+    "awayMs": 9500,
+    "lookAwayCount": 4,
+    "submittedAt": "2026-09-27T23:13:15.041Z"
+  }
+]

@@ -49,30 +49,24 @@
              into drying. -->
         <aside id="side-panel" class="hud-panel-side hidden">
           <div id="paint-hud">
-            <div class="hud-left">
-              <div id="coverage-label">Painted: 0%</div>
-              <div class="progress-track"><div id="coverage-bar" class="progress-fill"></div></div>
-            </div>
-            <div class="hud-right hud-actions">
+            <div id="coverage-label">Painted: 0%</div>
+            <div class="progress-track"><div id="coverage-bar" class="progress-fill"></div></div>
+            <div class="hud-actions">
               <button id="reset-wall-btn" class="tiny-link-btn">Wipe it off, start again</button>
             </div>
           </div>
 
           <!-- The drying percentage advances regardless of whether
                anyone's watching - the score ("Moments of calm", now in
-               #stats-bar above) only counts up while the mouse/finger is
-               on the painted wall itself - see the WATCHING mechanic in
-               game.js. -->
+               #stats-bar above) is the thing that only counts up while
+               the mouse is actually hovering the painted wall itself -
+               see the WATCHING mechanic in game.js. -->
           <div id="drying-hud" class="hidden">
-            <div class="hud-left">
-              <div id="drying-label">Drying: 0%</div>
-              <div class="progress-track"><div id="drying-bar" class="progress-fill drying-fill"></div></div>
-            </div>
-            <div class="hud-right">
-              <div id="watch-hint"><strong>TO WATCH:</strong> Keep your mouse pointer or finger pressed on the wall.</div>
-              <div id="caption-box">Still wet.</div>
-              <div id="away-banner" class="hidden">You looked away (mouse off the wall, or finger lifted). The paint keeps drying regardless - but your "moments of calm" score has paused, and just lost 5. Put your finger back on the wall to resume.</div>
-            </div>
+            <div id="drying-label">Drying: 0%</div>
+            <div class="progress-track"><div id="drying-bar" class="progress-fill drying-fill"></div></div>
+            <div id="watch-hint"><strong>TO WATCH:</strong> Keep your mouse pointer or finger pressed on the wall.</div>
+            <div id="caption-box">Still wet.</div>
+            <div id="away-banner" class="hidden">You looked away (mouse off the wall, or finger lifted). The paint keeps drying regardless - but your "moments of calm" score has paused, and just lost 5. Put your finger back on the wall to resume.</div>
           </div>
           <div id="round-hud" class="hidden">
             <h2 id="round-title">Round complete</h2>
@@ -95,14 +89,16 @@
         sequential upgrades. Pick a colour and cover the wall before the
         round timer runs out for a bonus - once it's fully painted,
         watching begins automatically. The paint dries at its own pace
-        regardless of whether you watch. You will be rewarded with "Moments
-        of calm": each watching eye pair earns for you; glasses
+        regardless of whether you watch. You will be measured by "Moments
+        of calm": each watching eye pair earns one point per second; glasses
         and golden upgrades increase the return. Look away and the paint doesn't mind, but you'll lose 5
         points on the spot for it.
       </p>
       <p class="game-summary">
         <strong>How to watch:</strong> Keep your mouse pointer or finger
-        pressed on the wall - lifting it counts as looking away. Only eyes on the paint earn calm.
+        pressed on the wall - lifting it counts as looking away. Your eyes sit
+        around the corners of a hexagon centred on your finger, so your finger
+        never hides them. Only eyes on the paint earn calm.
       </p>
 
       <div class="color-picker-block">
