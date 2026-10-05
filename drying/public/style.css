@@ -760,6 +760,7 @@ body { height: 100vh; height: 100dvh; min-height: 0; overflow-x: hidden; overflo
 #stats-bar #calm-heading { font-size: 40px; line-height: 1; text-align: center; }
 #calm-stat .stat-label { text-align: center; }
 #calm-stat { text-align: center; }
+.calm-total { display: block; color: #cfd8dc; font-size: 12px; line-height: 1.2; }
 /* Header order: Round info (left, left-aligned) | Moments of calm (centre) | Disturbances (right) */
 #stats-bar { grid-template-columns: 1.3fr 1fr 1fr; }
 #round-stat { grid-column: 1; grid-row: 1; text-align: left; }
@@ -846,3 +847,32 @@ body { height: 100vh; height: 100dvh; min-height: 0; overflow-x: hidden; overflo
   overflow-y: auto;   /* only scrolls if the box is taller than the screen */
 }
 .hud-panel-side.sheet-open #round-hud { width: 100%; margin: 0 auto; }
+
+/* ======================================================================= */
+/* STACKED (mobile / narrow) layout: the paint / drying panel sits in      */
+/* normal flow directly BELOW the wall instead of overlaying its floor     */
+/* strip, so the two never overlap. game.js (fitCanvas) shrinks the wall   */
+/* to leave room for it and pins #game-area to the canvas width. The      */
+/* round-over expand/contract is shared with the overlay layout (see       */
+/* openRoundSheet / closeRoundSheet in game.js). Keep the breakpoint in    */
+/* sync with STACK_QUERY in game.js.                                       */
+/* ======================================================================= */
+@media (max-width: 880px) {
+  .hud-panel-side {
+    position: static;
+    left: auto;
+    right: auto;
+    top: auto;
+    bottom: auto;
+    width: auto;
+    max-width: none;
+    min-width: 0;
+    margin: 12px 0 0;          /* = STACK_GAP in game.js */
+    padding: 8px 12px;
+    pointer-events: auto;
+  }
+  #paint-hud:not(.hidden), #drying-hud:not(.hidden) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #game-row { align-items: flex-start; }
+}

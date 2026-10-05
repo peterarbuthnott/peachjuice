@@ -2,6 +2,19 @@
   {
     "playerId": "f038dafe-71ae-421b-814e-cece2c7141fb",
     "name": "bob",
+    "colorName": "Cloud White",
+    "coveragePercent": 100,
+    "momentsOfCalm": 22362,
+    "paintBonusAwarded": true,
+    "totalElapsedMs": 972842,
+    "watchedMs": 825118,
+    "awayMs": 117,
+    "lookAwayCount": 0,
+    "submittedAt": "2026-10-03T13:22:18.956Z"
+  },
+  {
+    "playerId": "f038dafe-71ae-421b-814e-cece2c7141fb",
+    "name": "bob",
     "colorName": "Duck Egg",
     "coveragePercent": 100,
     "momentsOfCalm": 20970,
@@ -11,5 +24,18 @@
     "awayMs": 9500,
     "lookAwayCount": 4,
     "submittedAt": "2026-09-27T23:13:15.041Z"
+  },
+  {
+    "playerId": "f038dafe-71ae-421b-814e-cece2c7141fb",
+    "name": "bob",
+    "colorName": "Slate",
+    "coveragePercent": 100,
+    "momentsOfCalm": 8160,
+    "paintBonusAwarded": true,
+    "totalElapsedMs": 980603,
+    "watchedMs": 824234,
+    "awayMs": 983,
+    "lookAwayCount": 2,
+    "submittedAt": "2026-10-03T12:50:14.019Z"
   }
 ]

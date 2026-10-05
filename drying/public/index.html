@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Watch the Drying</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
   <link rel="stylesheet" href="scene-switcher.css?v=5">
 </head>
 <body>
@@ -24,7 +24,7 @@
   <!-- Persistent game header, with calm at left, round details centred,
        and disturbances at right. -->
   <div id="stats-bar" class="hidden">
-    <div class="game-stat" id="calm-stat"><span class="stat-label">Moments of Calm</span><strong id="calm-heading">0</strong></div>
+    <div class="game-stat" id="calm-stat"><span class="stat-label">Spendable Moments of Calm</span><strong id="calm-heading">0</strong><span id="calm-total" class="calm-total">Total: 0</span></div>
     <div class="game-stat" id="round-stat"><span class="stat-label">Round</span><strong id="round-heading">Arctic</strong><span id="round-details">1 / 10 · Paint 0:30 · Dry 1:30</span></div>
     <div class="game-stat" id="disturbances-stat"><span class="stat-label">Disturbances</span><strong id="away-stat">0:00 (0x)</strong></div>
   </div>
@@ -147,7 +147,7 @@
     </div>
   </div>
 
-  <script src="game.js"></script>
+  <script src="game.js?v=4"></script>
   <script src="scene-switcher.js" defer></script>
 </body>
 </html>

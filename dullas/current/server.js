@@ -40,8 +40,8 @@
 //
 // DATA FILES (created automatically under ./data on first run)
 //   data/highscores.ndjson - one line per submitted run's final score.
-//     GET /api/highscores reads this, keeps only each player's best line,
-//     sorts, and returns the top N - never deletes/rewrites the file.
+//     GET /api/highscores sorts all submitted runs and returns the top N -
+//     never deletes/rewrites the file.
 //   data/events.ndjson - one line per local telemetry event (round
 //     completions, upgrade purchases, run start/resume/end), submitted
 //     once per game-over from the same capped local event log the game
@@ -307,30 +307,13 @@ function handleGetHighscores(req, res) {
   limit = Math.min(limit, HIGHSCORE_LIMIT_MAX);
 
   var all = readLines(HIGHSCORES_FILE);
-  // Plain object instead of Map, keyed by playerId (always a string).
-  var bestByPlayer = {};
-  for (var i = 0; i < all.length; i++) {
-    var entry = all[i];
-    var existing = bestByPlayer[entry.playerId];
-    if (!existing || isBetterScore(entry, existing)) {
-      bestByPlayer[entry.playerId] = entry;
-    }
-  }
-
-  var allBest = [];
-  for (var playerId in bestByPlayer) {
-    if (Object.prototype.hasOwnProperty.call(bestByPlayer, playerId)) {
-      allBest.push(bestByPlayer[playerId]);
-    }
-  }
-
-  allBest.sort(function (a, b) {
+  all.sort(function (a, b) {
     if (isBetterScore(a, b)) return -1;
     if (isBetterScore(b, a)) return 1;
     return 0;
   });
 
-  var ranked = allBest.slice(0, limit).map(function (entry) {
+  var ranked = all.slice(0, limit).map(function (entry) {
     return {
       name: entry.name,
       round: entry.round,
@@ -354,53 +337,30 @@ function handleGetHighscores(req, res) {
 var REASON_ROUND_COMPLETE = 'You completed all 35 rounds!';
 var REASON_UPGRADE_COMPLETE = 'You maxed out every upgrade!';
 var REASON_PLAYER_FINISH_PREFIX = 'You chose to finish after round ';
-var LEADERBOARD_LIMIT = 10;
 
-// Keeps, per playerId, whichever entry is best according to metricFn -
-// entries where metricFn returns null/undefined (e.g. an older run with no
-// timeTakenMs recorded) are skipped entirely rather than sorting as 0.
-function pickBestPerPlayer(entries, metricFn, higherIsBetter) {
-  var bestByPlayer = {};
-  var i, e, v, existing, existingV, better;
-  for (i = 0; i < entries.length; i++) {
-    e = entries[i];
-    v = metricFn(e);
-    if (v === null || v === undefined || !isFinite(v)) continue;
-    existing = bestByPlayer[e.playerId];
-    if (!existing) {
-      bestByPlayer[e.playerId] = e;
-      continue;
-    }
-    existingV = metricFn(existing);
-    better = higherIsBetter ? (v > existingV) : (v < existingV);
-    if (better) bestByPlayer[e.playerId] = e;
-  }
-  var list = [];
-  for (var playerId in bestByPlayer) {
-    if (Object.prototype.hasOwnProperty.call(bestByPlayer, playerId)) list.push(bestByPlayer[playerId]);
-  }
-  return list;
-}
-
-// Builds one ranked, capped-at-LEADERBOARD_LIMIT board for a single metric:
-// best-per-player first (see above), then sorted best-to-worst.
+// Builds one ranked board for a single metric.
+// Every qualifying run is eligible; runs without a finite metric (such as
+// older runs that predate timeTakenMs) are skipped rather than sorted as 0.
 function rankTop(entries, metricFn, higherIsBetter, formatFn) {
-  var candidates = pickBestPerPlayer(entries, metricFn, higherIsBetter);
+  var candidates = [];
+  for (var i = 0; i < entries.length; i++) {
+    var value = metricFn(entries[i]);
+    if (value !== null && value !== undefined && isFinite(value)) candidates.push(entries[i]);
+  }
   candidates.sort(function (a, b) {
     var av = metricFn(a);
     var bv = metricFn(b);
     return higherIsBetter ? (bv - av) : (av - bv);
   });
-  var top = candidates.slice(0, LEADERBOARD_LIMIT);
   var out = [];
-  for (var i = 0; i < top.length; i++) {
-    var v = metricFn(top[i]);
+  for (var i = 0; i < candidates.length; i++) {
+    var v = metricFn(candidates[i]);
     out.push({
       rank: i + 1,
-      name: top[i].name,
+      name: candidates[i].name,
       value: v,
       formattedValue: formatFn ? formatFn(v) : v,
-      submittedAt: top[i].submittedAt,
+      submittedAt: candidates[i].submittedAt,
     });
   }
   return out;

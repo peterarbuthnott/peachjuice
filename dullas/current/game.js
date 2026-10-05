@@ -423,10 +423,9 @@ function currentGoldenChance() {
   return Math.min(GOLDEN_CHANCE_CAP, BASE_GOLDEN_CHANCE + level * GOLDEN_CHANCE_PER_LEVEL);
 }
 
-// Speed bonus: round 1's 5 plates need to be finished in under a minute,
-// which works out to a 12-second-per-plate budget. Bigger rounds (from the
-// "extra dishes" upgrade, or just later rounds) get proportionally more
-// time. Both this and the stack-fill bonus are expressed as a number of
+// Speed bonus: finish a round within a 12-second-per-plate budget. Bigger
+// rounds (from the "extra dishes" upgrade, or just later rounds) get
+// proportionally more time. Both this and the stack-fill bonus are expressed as a number of
 // plates, then converted to currency at the CURRENT plates-per-plate rate.
 const TIME_BONUS_SECONDS_PER_PLATE = 12;
 const TIME_BONUS_PAYOUT_FRACTION = 0.5; // 50% of the round's plate count, as a plate bonus
@@ -748,7 +747,7 @@ function samplePercentClear(sourceCanvas, sampleCtx, invert = false) {
 // How many total plates a given round has (base curve, before the
 // "extra dishes" upgrade doubles it - see platesForRound()).
 function baselinePlatesForRound(round) {
-  return round + 4; // round 1 = 5 plates, +1 plate per round after that
+  return round === 1 ? 1 : round + 4; // round 1 = 1 plate; rounds 2+ add one plate each
 }
 
 // Hard safety cap on plates in any single round, regardless of what the
@@ -852,7 +851,10 @@ function saveSnapshot() {
     playerId: state.playerId,
     runId: state.runId,
     runStartedAt: state.runStartedAt,
-    round: state.round,
+    // A completed round is a checkpoint for the next round. This also
+    // keeps purchases made on the round-complete screen from moving the
+    // Continue save back to the round the player has already finished.
+    round: state.roundComplete ? state.round + 1 : state.round,
     platesCleaned: state.platesCleaned,
     totalPlatesWashed: state.totalPlatesWashed,
     goldenPlatesWashed: state.goldenPlatesWashed,
@@ -1387,7 +1389,11 @@ function onRoundComplete() {
   const elapsed = performance.now() - state.roundStartTime;
   const timeLimitMs = state.roundTotalPlates * TIME_BONUS_SECONDS_PER_PLATE * 1000;
   const bonusEarned = elapsed < timeLimitMs;
-  const bonusPlateCount = bonusEarned ? Math.round(state.roundTotalPlates * TIME_BONUS_PAYOUT_FRACTION) : 0;
+  // Round 1 has one plate, so guarantee enough bonus currency (four plates)
+  // to buy the first sponge upgrade after its one-plate base reward.
+  const bonusPlateCount = bonusEarned
+    ? Math.max(state.round === 1 ? 4 : 0, Math.round(state.roundTotalPlates * TIME_BONUS_PAYOUT_FRACTION))
+    : 0;
   const bonusAmount = bonusPlateCount * NORMAL_REWARD * state.rewardMultiplier;
   if (bonusAmount > 0) {
     state.platesCleaned += bonusAmount;
@@ -1439,7 +1445,7 @@ function onRoundComplete() {
   roundCompleteBonus.textContent = bonusEarned
     ? `⏱ Finished in ${formatDuration(elapsed)} - Speed bonus: +${bonusAmount} plates! (target: ${formatMinSec(timeLimitMs)})`
     : `⏱ Finished in ${formatDuration(elapsed)} - too slow for the speed bonus (target: ${formatMinSec(timeLimitMs)})`;
-  finishRunBtn.classList.toggle('hidden', state.round < 10);
+  finishRunBtn.classList.toggle('hidden', state.round < 5);
   roundCompletePanel.classList.remove('hidden');
   // window.__pushRoundCompleteAd() (see index.html's ADSENSE block) only
   // actually does anything the very first time this fires - it pushes the
@@ -1516,7 +1522,7 @@ nextRoundBtn.addEventListener('click', () => {
 });
 
 finishRunBtn.addEventListener('click', () => {
-  if (state.gameOver || !state.roundComplete || state.round < 10) return;
+  if (state.gameOver || !state.roundComplete || state.round < 5) return;
   showGameOverScreen('You chose to finish after round ' + state.round + '.');
 });
 

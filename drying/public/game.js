@@ -5,7 +5,7 @@
 //   1. PAINTING - drag the brush over the wall to build up coverage. Once
 //      the wall is thoroughly covered, "Start Watching It Dry" unlocks.
 //   2. DRYING - the whole point of the game. A progress bar climbs from 0
-//      to 100% over DRY_DURATION_MS of *watched* time - see the WATCHING
+//      to 100% over the current round's duration (dryDurationForRound) - see the WATCHING
 //      mechanic below: the clock only runs while the mouse is actually
 //      hovering over the painted wall. Move it off the canvas (or switch
 //      tabs), and the paint just... waits for you. Forever, if need be.
@@ -18,7 +18,10 @@
 // ============================================================================
 
 const canvas = document.getElementById('wall-canvas');
-const ctx = canvas.getContext('2d');
+// alpha:false - every pixel of the scene is opaque, so the compositor can skip
+// blending the canvas with the page (cheaper on mobile GPUs). `let` because
+// buildOverlayLayer() briefly points ctx at an offscreen canvas.
+let ctx = canvas.getContext('2d', { alpha: false });
 const CANVAS_W = canvas.width;
 const CANVAS_H = canvas.height;
 const SKIRTING_H = 70; // bottom strip of the canvas - never paintable
@@ -60,6 +63,7 @@ const splashScreen = document.getElementById('splash-screen');
 const gameOverScreen = document.getElementById('game-over-screen');
 const statsBar = document.getElementById('stats-bar');
 const calmHeading = document.getElementById('calm-heading');
+const calmTotal = document.getElementById('calm-total');
 const roundHeading = document.getElementById('round-heading');
 const roundDetails = document.getElementById('round-details');
 const awayStat = document.getElementById('away-stat');
@@ -69,58 +73,147 @@ const sidePanel = document.getElementById('side-panel');
 // canvas is sized to the largest 3:2 box that fits #game-row. The paint /
 // drying panel is an overlay across the floor strip at the bottom of it.
 const gameRowEl = document.getElementById('game-row');
-function fitCanvas() {
+const gameAreaEl = document.getElementById('game-area');
+
+// STACKED (mobile / narrow) layout: the paint / drying panel sits in normal
+// flow directly BELOW the canvas instead of overlaying its floor strip (see
+// the max-width:880px block at the end of style.css). Keep the breakpoint in
+// sync with that block.
+const STACK_QUERY = '(max-width: 880px)';
+const STACK_GAP = 12; // px between canvas and panel - matches the panel's CSS margin-top
+function isStacked() { return window.matchMedia(STACK_QUERY).matches; }
+
+// The canvas is sized to leave room for the panel, so it must not resize
+// every time the panel's content changes (e.g. the "you looked away" banner
+// appearing). Reserve the panel's WORST-CASE height up front.
+let panelReserve = 0;
+
+// getBoundingClientRect() forces a layout, and pointermove fires at up to the
+// display refresh rate - so cache the canvas rect and only re-read it when
+// something that can move/resize the canvas has happened.
+let canvasRect = null;
+function getCanvasRect() {
+  return canvasRect || (canvasRect = canvas.getBoundingClientRect());
+}
+function invalidateCanvasRect() { canvasRect = null; }
+window.addEventListener('scroll', invalidateCanvasRect, { passive: true, capture: true });
+window.addEventListener('resize', invalidateCanvasRect);
+
+function measurePanelReserve() {
+  if (sidePanel.classList.contains('hidden') || sidePanel.classList.contains('sheet')) return 0;
+  const was = {
+    paint: paintHud.classList.contains('hidden'),
+    dry: dryingHud.classList.contains('hidden'),
+    round: roundHud.classList.contains('hidden'),
+    away: awayBanner.classList.contains('hidden'),
+  };
+  sidePanel.style.minHeight = '';
+  paintHud.classList.add('hidden');
+  roundHud.classList.add('hidden');
+  dryingHud.classList.remove('hidden');
+  awayBanner.classList.remove('hidden');
+  const hgt = sidePanel.offsetHeight;
+  paintHud.classList.toggle('hidden', was.paint);
+  dryingHud.classList.toggle('hidden', was.dry);
+  roundHud.classList.toggle('hidden', was.round);
+  awayBanner.classList.toggle('hidden', was.away);
+  return hgt;
+}
+function fitCanvas(remeasure) {
+  if (sidePanel.classList.contains('sheet')) return; // round-over sheet is animating; layout is held by a spacer
   const w = gameRowEl.clientWidth;
   const h = gameRowEl.clientHeight;
   if (!w || !h) return;
-  const s = Math.min(w / CANVAS_W, h / CANVAS_H);
-  canvas.style.width = Math.floor(CANVAS_W * s) + 'px';
+  let availH = h;
+  if (isStacked() && !sidePanel.classList.contains('hidden')) {
+    if (remeasure === true || !panelReserve) panelReserve = measurePanelReserve();
+    // Grow-only fallback for unexpectedly tall content - but never count the
+    // round-complete sheet content (it's tall, and only shown in the sheet).
+    if (roundHud.classList.contains('hidden')) panelReserve = Math.max(panelReserve, sidePanel.offsetHeight);
+    // Space is reserved for the panel's worst case, but the panel itself is NOT
+    // forced to that height - it stays as small as its current content.
+    availH = h - panelReserve - STACK_GAP;
+  } else {
+    panelReserve = 0;
+    sidePanel.style.minHeight = '';
+  }
+  const s = Math.min(w / CANVAS_W, Math.max(availH, 0) / CANVAS_H);
+  const cw = Math.floor(CANVAS_W * s);
+  canvas.style.width = cw + 'px';
   canvas.style.height = Math.floor(CANVAS_H * s) + 'px';
+  // Pin the area to the canvas width when stacked so the panel (whose text
+  // would otherwise widen the shrink-to-fit area) matches the wall exactly.
+  gameAreaEl.style.width = (isStacked() && !sidePanel.classList.contains('hidden')) ? cw + 'px' : '';
+  invalidateCanvasRect();
 }
-window.addEventListener('resize', fitCanvas);
-window.addEventListener('orientationchange', fitCanvas);
-if (window.ResizeObserver) new ResizeObserver(fitCanvas).observe(gameRowEl);
-fitCanvas();
+window.addEventListener('resize', () => fitCanvas(true));
+window.addEventListener('orientationchange', () => fitCanvas(true));
+if (window.ResizeObserver) {
+  new ResizeObserver(() => fitCanvas()).observe(gameRowEl);
+  new ResizeObserver(() => fitCanvas()).observe(sidePanel);
+}
+fitCanvas(true);
 
 // ROUND SHEET - at the end of a round the panel "scrolls" up from its spot
 // over the floor to cover the whole screen; "Start next wall" scrolls it back.
 const SHEET_MS = 600;
 let sheetCollapsedHeight = 0;
+// In the stacked layout the panel is in normal flow below the canvas. When it
+// goes position:fixed to expand, a spacer holds its place so the canvas
+// doesn't jump, and gives the contract animation its resting position.
+let sheetSpacer = null;
+let sheetSpacerMargin = 0;
 function sheetTransition() {
   return ['top', 'left', 'width', 'height', 'border-radius'].map((p) => `${p} ${SHEET_MS}ms ease`).join(', ');
 }
 function openRoundSheet(swapContent) {
   const r = sidePanel.getBoundingClientRect();
   sheetCollapsedHeight = r.height;
+  if (getComputedStyle(sidePanel).position === 'static') {
+    sheetSpacerMargin = parseFloat(getComputedStyle(sidePanel).marginTop) || 0;
+    sheetSpacer = document.createElement('div');
+    sheetSpacer.style.height = (r.height + sheetSpacerMargin) + 'px';
+    sheetSpacer.style.flex = '0 0 auto';
+    sidePanel.insertAdjacentElement('afterend', sheetSpacer);
+  }
   sidePanel.style.transition = 'none';
   Object.assign(sidePanel.style, { position: 'fixed', left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px', right: 'auto', bottom: 'auto', margin: '0' });
   sidePanel.classList.add('sheet');
   swapContent(); // round-complete content replaces the drying content
   // Grow upward (bottom edge stays put) only as far as needed to show the
   // whole box including the Start next wall button - capped to the screen.
+  // (Anchor is clamped to the viewport so a panel that starts near/below the
+  // fold in the stacked layout still opens fully on screen.)
+  const anchorBottom = Math.min(r.bottom, window.innerHeight - 4);
   const needed = sidePanel.scrollHeight;
-  const maxH = Math.max(r.height, r.bottom - 4);
+  const maxH = Math.max(r.height, anchorBottom - 4);
   const targetH = Math.min(Math.max(needed, r.height), maxH);
   void sidePanel.offsetHeight;
   sidePanel.style.transition = sheetTransition();
-  Object.assign(sidePanel.style, { top: (r.bottom - targetH) + 'px', height: targetH + 'px' });
+  Object.assign(sidePanel.style, { top: (anchorBottom - targetH) + 'px', height: targetH + 'px' });
   setTimeout(() => sidePanel.classList.add('sheet-open'), SHEET_MS);
 }
 function clearSheetStyles() {
   sidePanel.classList.remove('sheet', 'sheet-open');
   ['transition', 'position', 'left', 'top', 'width', 'height', 'right', 'bottom', 'margin'].forEach((p) => { sidePanel.style[p] = ''; });
+  if (sheetSpacer) { sheetSpacer.remove(); sheetSpacer = null; }
 }
 function closeRoundSheet(done) {
-  const cr = canvas.getBoundingClientRect();
   const h = sheetCollapsedHeight || 80;
+  let restTop;
+  if (sheetSpacer) {
+    // Stacked: contract back to the spot just below the canvas.
+    restTop = sheetSpacer.getBoundingClientRect().top + sheetSpacerMargin;
+  } else {
+    // Overlay: contract back onto the floor strip at the bottom of the canvas.
+    const cr = canvas.getBoundingClientRect();
+    restTop = cr.bottom - cr.height * 0.015 - h;
+  }
   sidePanel.classList.remove('sheet-open');
   sidePanel.scrollTop = 0;
   sidePanel.style.transition = sheetTransition();
-  Object.assign(sidePanel.style, {
-    height: h + 'px',
-    top: (cr.bottom - cr.height * 0.015 - h) + 'px',
-  });
-  setTimeout(() => { clearSheetStyles(); done(); }, SHEET_MS + 30);
+  Object.assign(sidePanel.style, { height: h + 'px', top: restTop + 'px' });
+  setTimeout(() => { clearSheetStyles(); done(); fitCanvas(true); }, SHEET_MS + 30);
 }
 const paintHud = document.getElementById('paint-hud');
 const dryingHud = document.getElementById('drying-hud');
@@ -182,13 +275,90 @@ function roomSceneName() {
     .replace(/^./, (letter) => letter.toUpperCase());
 }
 
-const DRY_DURATION_MS = 90 * 1000; // 90s of real time to fully dry, watched or not
+const DRY_DURATION_FIRST_ROUND_MS = 60 * 1000;
+const DRY_DURATION_ADD_PER_ROUND_MS = 5 * 1000;
+function dryDurationForRound(round) {
+  return DRY_DURATION_FIRST_ROUND_MS + Math.max(0, round - 1) * DRY_DURATION_ADD_PER_ROUND_MS;
+}
 const SAMPLE_W = 60;
 const SAMPLE_H = 40;
 
 const PAINT_TIME_LIMIT_MS = 30 * 1000; // round timer for the painting phase
-const PAINT_TIME_BONUS = 10; // Moments of calm awarded for finishing the paint job in time
+const PAINT_TIME_BONUS = 20; // Moments of calm awarded for finishing the paint job in time
 const MAX_ROUNDS = 10;
+
+// Small synthesized effects, following Dullas's Web Audio approach. The
+// context is created only after a real gesture so browsers permit playback.
+let soundContext = null;
+let soundMaster = null;
+let lastPaintSwishAt = 0;
+let nextDryTickAt = 0;
+function ensureSoundContext() {
+  if (soundContext) {
+    if (soundContext.state === 'suspended') soundContext.resume();
+    return;
+  }
+  try {
+    soundContext = new (window.AudioContext || window.webkitAudioContext)();
+    soundMaster = soundContext.createGain();
+    soundMaster.gain.value = 0.45;
+    soundMaster.connect(soundContext.destination);
+  } catch (e) { soundContext = null; }
+}
+function playSoundTone(freq, duration, volume, type = 'sine', delay = 0, endFreq = null) {
+  if (!soundContext || soundContext.state !== 'running') return;
+  const at = soundContext.currentTime + delay;
+  const oscillator = soundContext.createOscillator();
+  const gain = soundContext.createGain();
+  oscillator.type = type;
+  oscillator.frequency.setValueAtTime(freq, at);
+  if (endFreq !== null) oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, endFreq), at + duration);
+  gain.gain.setValueAtTime(0, at);
+  gain.gain.linearRampToValueAtTime(volume, at + 0.006);
+  gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+  oscillator.connect(gain).connect(soundMaster);
+  oscillator.start(at);
+  oscillator.stop(at + duration + 0.02);
+}
+function playSwish() {
+  playSoundTone(680, 0.13, 0.045, 'sawtooth', 0, 260);
+}
+function updatePaintSwish() {
+  const now = performance.now();
+  if (now - lastPaintSwishAt >= 120) {
+    playSwish();
+    lastPaintSwishAt = now;
+  }
+}
+function playTick() { playSoundTone(1450, 0.035, 0.018, 'triangle'); }
+function playPlip() { playSoundTone(920, 0.075, 0.035, 'sine', 0, 560); }
+function playPop() {
+  playSoundTone(260, 0.09, 0.09, 'sine', 0, 130);
+  playSoundTone(620, 0.11, 0.055, 'sine', 0.045, 880);
+}
+function playDoying() {
+  playSoundTone(570, 0.14, 0.075, 'triangle', 0, 390);
+  playSoundTone(820, 0.22, 0.07, 'sine', 0.12, 1180);
+}
+function playDing() {
+  playSoundTone(1250, 0.15, 0.065, 'sine');
+  playSoundTone(1760, 0.2, 0.045, 'sine', 0.05);
+}
+function playKaChing() {
+  playSoundTone(1100, 0.14, 0.07, 'square');
+  playSoundTone(1650, 0.18, 0.08, 'square', 0.09);
+}
+function playDaPaDing() {
+  playSoundTone(390, 0.12, 0.075, 'triangle');
+  playSoundTone(270, 0.13, 0.075, 'triangle', 0.12);
+  playSoundTone(1320, 0.24, 0.065, 'sine', 0.25);
+}
+function primeSoundOnGesture() {
+  ensureSoundContext();
+  if (soundContext) soundContext.resume();
+}
+window.addEventListener('pointerdown', primeSoundOnGesture, { once: true, capture: true });
+window.addEventListener('keydown', primeSoundOnGesture, { once: true, capture: true });
 const UPGRADES = [
   { id: 'brush', name: 'Bigger brush', max: 5, costForLevel: (level) => 50 * Math.pow(2, level - 1), description: 'A bigger brush makes painting the wall quicker.' },
   { id: 'eyes', name: 'Extra Eyes', max: 5, costForLevel: (level) => 100 * Math.pow(2, level - 1), description: 'Adds one eye pair, at another corner of the hexagon around your finger/pointer. Up to six pairs can earn calm.' },
@@ -256,7 +426,9 @@ const EYE_SCALE = 1.6; // eyes are drawn (and hit-tested) at 1.6x their base siz
 const HEX_PAIR_VERTEX = [4, 5, 3, 0, 2, 1];
 
 function hexRadius() {
-  const rect = canvas.getBoundingClientRect();
+  // Called several times per frame per eye pair - use the cached rect rather
+  // than forcing a layout each time.
+  const rect = getCanvasRect();
   const scale = rect.width > 0 ? rect.width / CANVAS_W : 1;
   return (HEX_WIDTH_CSS_PX / 2) / scale;
 }
@@ -315,6 +487,10 @@ function upgradeTargets(def) {
 
 function paintTimeLimitForRound(round) {
   return Math.max(8000, PAINT_TIME_LIMIT_MS - (round - 1) * 2500);
+}
+
+function paintTimeBonusForRound(round) {
+  return Math.ceil(PAINT_TIME_BONUS * PAINT_TIME_LIMIT_MS / paintTimeLimitForRound(round));
 }
 
 const CAPTIONS = [
@@ -439,7 +615,7 @@ function roundWatchingScore() {
 
 function computeMomentsOfCalm() {
   const activeRoundScore = state.phase === 'drying'
-    ? roundWatchingScore() + (state.paintBonusAwarded ? PAINT_TIME_BONUS : 0) - state.lookAwayCount * 5
+    ? roundWatchingScore() + (state.paintBonusAwarded ? paintTimeBonusForRound(state.round) : 0) - state.lookAwayCount * 5
     : 0;
   return Math.max(0,
     state.totalMomentsOfCalmEarned + activeRoundScore - state.calmSpent
@@ -566,10 +742,23 @@ finishCanvas.width = CANVAS_W;
 finishCanvas.height = WALL_H;
 const finishCtx = finishCanvas.getContext('2d');
 
-const sampleCanvas = document.createElement('canvas');
-sampleCanvas.width = SAMPLE_W;
-sampleCanvas.height = SAMPLE_H;
-const sampleCtx = sampleCanvas.getContext('2d');
+// Perf: cached render layers. The wall (texture + paint + wet/dry finish) only
+// needs recompositing when paint is added or the finish visibly changes, and
+// the room furniture (side returns, ceiling, floor, window) is static for a
+// whole round - so each is drawn into its own offscreen canvas ONCE and the
+// per-frame work is just two drawImage calls plus lamp, timer and cursor.
+const wallLayer = document.createElement('canvas');
+wallLayer.width = CANVAS_W;
+wallLayer.height = WALL_H;
+const wallLayerCtx = wallLayer.getContext('2d', { alpha: false });
+const overlayLayer = document.createElement('canvas');
+overlayLayer.width = CANVAS_W;
+overlayLayer.height = CANVAS_H;
+const overlayLayerCtx = overlayLayer.getContext('2d');
+let wallDirty = true;          // paint changed since wallLayer was last composited
+let wallFinishKey = -1;        // quantized wet/dry state wallLayer was last composited with
+let overlayRound = -1;         // round the overlay layer was built for
+let lastPointerMoveAt = 0;     // performance.now() of the last pointer movement over the wall
 
 // Coverage is sampled from the INNER rectangle - exactly the paintable
 // area now that the side returns are straight verticals (see
@@ -734,7 +923,7 @@ function updateLightPhysics(dtMs) {
 // Painting
 // ----------------------------------------------------------------------------
 function getCanvasPoint(clientX, clientY) {
-  const rect = canvas.getBoundingClientRect();
+  const rect = getCanvasRect();
   const scaleX = CANVAS_W / rect.width;
   const scaleY = CANVAS_H / rect.height;
   return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
@@ -746,24 +935,53 @@ function getCanvasPoint(clientX, clientY) {
 // underneath. The soft-edged falloff is still there (so brush strokes
 // blend into each other rather than showing hard circles), it's just
 // steep rather than gradual.
+// Perf: the soft-edged dab is rendered ONCE per (colour, brush size) into a
+// small sprite, and each dab is then a single drawImage. Before, every dab
+// parsed the hex colour with a regex, built a radial gradient with three
+// colour-stop strings and filled an arc - several times per pointermove.
+let dabSprite = null;
+let dabSpriteKey = '';
+function currentBrushRadius() {
+  return BRUSH_RADIUS * 0.8 * Math.pow(1.2, state.upgrades.brush);
+}
+function getDabSprite(brushSize) {
+  const key = state.selectedColor.hex + '|' + brushSize.toFixed(2);
+  if (dabSprite && key === dabSpriteKey) return dabSprite;
+  const half = Math.ceil(brushSize) + 1;
+  if (!dabSprite) dabSprite = document.createElement('canvas');
+  dabSprite.width = dabSprite.height = half * 2; // (re)sizing also clears it
+  const sctx = dabSprite.getContext('2d');
+  const g = sctx.createRadialGradient(half, half, 0, half, half, brushSize);
+  g.addColorStop(0, rgbaString(state.selectedColor.hex, 0.95));
+  g.addColorStop(0.75, rgbaString(state.selectedColor.hex, 0.85));
+  g.addColorStop(1, rgbaString(state.selectedColor.hex, 0));
+  sctx.fillStyle = g;
+  sctx.beginPath();
+  sctx.arc(half, half, brushSize, 0, Math.PI * 2);
+  sctx.fill();
+  dabSprite._half = half;
+  dabSpriteKey = key;
+  return dabSprite;
+}
+
 function paintDab(x, y) {
   if (!state.selectedColor) return;
   maybeKnockLight(x, y);
   if (!isPaintable(x, y)) return;
-  const brushSize = BRUSH_RADIUS * 0.8 * Math.pow(1.2, state.upgrades.brush);
-  const g = paintCtx.createRadialGradient(x, y, 0, x, y, brushSize);
-  g.addColorStop(0, rgbaString(state.selectedColor.hex, 0.95));
-  g.addColorStop(0.75, rgbaString(state.selectedColor.hex, 0.85));
-  g.addColorStop(1, rgbaString(state.selectedColor.hex, 0));
-  paintCtx.fillStyle = g;
-  paintCtx.beginPath();
-  paintCtx.arc(x, y, brushSize, 0, Math.PI * 2);
-  paintCtx.fill();
+  const brushSize = currentBrushRadius();
+  const sprite = getDabSprite(brushSize);
+  paintCtx.drawImage(sprite, x - sprite._half, y - sprite._half);
+  markCoverage(x, y, brushSize);
+  wallDirty = true;
 }
 
+// Dabs are spaced a fixed FRACTION of the brush radius apart (never closer
+// than 4px) instead of a fixed 4px, so a big upgraded brush doesn't pay for
+// 3x as many heavily-overlapping dabs for the same visual result.
 function strokeTo(x0, y0, x1, y1) {
   const dist = Math.hypot(x1 - x0, y1 - y0);
-  const steps = Math.max(1, Math.floor(dist / 4));
+  const spacing = Math.max(4, currentBrushRadius() * 0.17);
+  const steps = Math.max(1, Math.floor(dist / spacing));
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
     paintDab(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t);
@@ -777,32 +995,65 @@ function clampToWall(pt) {
   };
 }
 
-function computeCoverage() {
-  sampleCtx.clearRect(0, 0, SAMPLE_W, SAMPLE_H);
-  sampleCtx.drawImage(paintCanvas, INNER.left, INNER.top, INNER.width, INNER.height, 0, 0, SAMPLE_W, SAMPLE_H);
-  const data = sampleCtx.getImageData(0, 0, SAMPLE_W, SAMPLE_H).data;
-  let covered = 0;
-  const total = SAMPLE_W * SAMPLE_H;
+// COVERAGE - perf: tracked incrementally instead of read back from the GPU.
+// The old approach every 150ms downscaled the whole paint layer into a small
+// canvas and called getImageData() on it - a GPU->CPU readback that stalls
+// the pipeline (and costs real battery on phones) even when nothing had
+// changed. Now each dab flags the sample cells it covers in a tiny grid
+// (60x40 bytes) and keeps a running count, so reading coverage is O(1).
+// A cell counts as covered once its centre is within DAB_COVER_FRACTION of
+// the dab radius - where a single dab's alpha is still above the old 130/255
+// threshold. The 100% gap-fill pass (fillRemainingGaps) is unchanged.
+const DAB_COVER_FRACTION = 0.88;
+const CELL_W = INNER.width / SAMPLE_W;
+const CELL_H = INNER.height / SAMPLE_H;
+const CELL_UNPAINTED = 0, CELL_COVERED = 1, CELL_WINDOW = 2;
+const coverageCells = new Uint8Array(SAMPLE_W * SAMPLE_H);
+const coverageBaseCells = new Uint8Array(SAMPLE_W * SAMPLE_H); // blank-wall state: window cells pre-flagged
+let paintableCellCount = 0;
+(function initCoverageGrid() {
   for (let py = 0; py < SAMPLE_H; py++) {
     for (let px = 0; px < SAMPLE_W; px++) {
-      if (px >= WINDOW_SAMPLE.x0 && px < WINDOW_SAMPLE.x1 && py >= WINDOW_SAMPLE.y0 && py < WINDOW_SAMPLE.y1) {
-        covered++; // the window doesn't accept paint - don't hold that against the player
-        continue;
-      }
-      const idx = (py * SAMPLE_W + px) * 4;
-      if (data[idx + 3] > 130) covered++;
+      const inWindow = px >= WINDOW_SAMPLE.x0 && px < WINDOW_SAMPLE.x1 && py >= WINDOW_SAMPLE.y0 && py < WINDOW_SAMPLE.y1;
+      coverageBaseCells[py * SAMPLE_W + px] = inWindow ? CELL_WINDOW : CELL_UNPAINTED; // the window doesn't accept paint
+      if (!inWindow) paintableCellCount++;
     }
   }
-  // Normalize out the window's fixed contribution (see
-  // WINDOW_SAMPLE_CELL_COUNT above) - without this, an entirely blank
-  // wall reads as ~12% just from the window, and the actual paintable
-  // pixels being 100% covered doesn't necessarily land on an exact 100%
-  // reading either. This rescales the real 0-100% paintable range back
-  // onto a clean 0-100% display, regardless of the window's footprint.
-  const windowFloorPercent = (WINDOW_SAMPLE_CELL_COUNT / total) * 100;
-  const rawPercent = (covered / total) * 100;
-  const normalized = ((rawPercent - windowFloorPercent) / (100 - windowFloorPercent)) * 100;
-  return Math.max(0, Math.min(100, Math.round(normalized)));
+})();
+let coveredCellCount = 0;
+
+function resetCoverageGrid() {
+  coverageCells.set(coverageBaseCells);
+  coveredCellCount = 0;
+}
+
+function markCoverage(x, y, radius) {
+  const r = radius * DAB_COVER_FRACTION;
+  const r2 = r * r;
+  const px0 = Math.max(0, Math.floor((x - r - INNER.left) / CELL_W));
+  const px1 = Math.min(SAMPLE_W - 1, Math.floor((x + r - INNER.left) / CELL_W));
+  const py0 = Math.max(0, Math.floor((y - r - INNER.top) / CELL_H));
+  const py1 = Math.min(SAMPLE_H - 1, Math.floor((y + r - INNER.top) / CELL_H));
+  for (let py = py0; py <= py1; py++) {
+    const dy = INNER.top + (py + 0.5) * CELL_H - y;
+    const dy2 = dy * dy;
+    if (dy2 > r2) continue;
+    const row = py * SAMPLE_W;
+    for (let px = px0; px <= px1; px++) {
+      if (coverageCells[row + px] !== CELL_UNPAINTED) continue;
+      const dx = INNER.left + (px + 0.5) * CELL_W - x;
+      if (dx * dx + dy2 <= r2) {
+        coverageCells[row + px] = CELL_COVERED;
+        coveredCellCount++;
+      }
+    }
+  }
+}
+
+// 0-100 over the PAINTABLE cells only (the window's footprint is excluded,
+// so a blank wall is 0% and a fully painted one 100%).
+function computeCoverage() {
+  return Math.max(0, Math.min(100, Math.round((coveredCellCount / paintableCellCount) * 100)));
 }
 
 // The alpha-threshold sampling in computeCoverage() can read as "100%"
@@ -817,17 +1068,26 @@ function fillRemainingGaps() {
   paintCtx.fillStyle = state.selectedColor.hex;
   paintCtx.fillRect(EDGE_W, CEILING_H, CANVAS_W - EDGE_W * 2, WALL_H - CEILING_H);
   paintCtx.restore();
+  wallDirty = true;
 }
 
+// Cheap enough to call on every pointermove: computeCoverage() is O(1) and
+// the DOM is only touched when the displayed percentage actually changes.
+let shownCoverageLabel = '';
 function updateCoverageUI() {
   state.coveragePercent = computeCoverage();
-  coverageLabel.textContent = `Round ${state.round} / ${MAX_ROUNDS} · Painted: ${state.coveragePercent}%`;
-  coverageBar.style.width = `${state.coveragePercent}%`;
+  const label = `Round ${state.round} / ${MAX_ROUNDS} · Painted: ${state.coveragePercent}%`;
+  if (label !== shownCoverageLabel) {
+    shownCoverageLabel = label;
+    coverageLabel.textContent = label;
+    coverageBar.style.width = `${state.coveragePercent}%`;
+  }
 
   if (state.coveragePercent >= 100 && !state.wallFilledAt100) {
     state.wallFilledAt100 = true;
     fillRemainingGaps();
-    coverageLabel.textContent = 'Painted: 100% - starting to watch it dry…';
+    shownCoverageLabel = 'Painted: 100% - starting to watch it dry…';
+    coverageLabel.textContent = shownCoverageLabel;
     // A short beat so the player actually sees "100%" land before the
     // view switches - no button to click, painting just flows straight
     // into watching.
@@ -837,42 +1097,48 @@ function updateCoverageUI() {
 
 function resetWall() {
   paintCtx.clearRect(0, 0, CANVAS_W, WALL_H);
+  resetCoverageGrid();
+  wallDirty = true;
   state.coveragePercent = 0;
   state.wallFilledAt100 = false;
+  shownCoverageLabel = ''; // force the label/bar to refresh
   updateCoverageUI();
 }
 
-// Coverage sampling runs on its own timer (started in the "Start Painting"
-// handler, stopped once painting ends) rather than only after each stroke,
-// so the % readout keeps climbing even if the player holds the brush
-// still for a moment mid-drag.
-function startCoverageSampling() {
-  if (coverageInterval) clearInterval(coverageInterval);
-  coverageInterval = setInterval(updateCoverageUI, 150);
-}
-function stopCoverageSampling() {
-  if (coverageInterval) clearInterval(coverageInterval);
-  coverageInterval = null;
-}
+// Perf: there is no coverage timer any more - coverage is tracked per dab
+// (see markCoverage) and the UI refreshed from the pointer handlers. These
+// stay as no-ops so existing call sites keep working; a waking interval
+// every 150ms was pure battery cost.
+function startCoverageSampling() {}
+function stopCoverageSampling() {}
 
 canvas.addEventListener('pointerdown', (e) => {
   if (state.phase !== 'painting') return;
+  invalidateCanvasRect(); // fresh bounds at the start of every gesture
   state.isStroking = true;
+  lastPointerMoveAt = performance.now();
   const pt = clampToWall(getCanvasPoint(e.clientX, e.clientY));
   state.lastPoint = pt;
   paintDab(pt.x, pt.y);
+  updatePaintSwish();
+  updateCoverageUI();
 });
 
 canvas.addEventListener('pointermove', (e) => {
   state.pointerOverCanvas = true;
+  lastPointerMoveAt = performance.now();
   state.lastMouse = getCanvasPoint(e.clientX, e.clientY);
   if (state.phase !== 'painting' || !state.isStroking) return;
   const pt = clampToWall(state.lastMouse);
   if (state.lastPoint) strokeTo(state.lastPoint.x, state.lastPoint.y, pt.x, pt.y);
+  updatePaintSwish();
   state.lastPoint = pt;
+  updateCoverageUI();
 });
 
 canvas.addEventListener('pointerenter', (e) => {
+  invalidateCanvasRect();
+  lastPointerMoveAt = performance.now();
   state.pointerOverCanvas = true;
   state.lastMouse = getCanvasPoint(e.clientX, e.clientY);
 });
@@ -1421,17 +1687,51 @@ function drawEyesCursor(x, y, now) {
   ctx.restore();
 }
 
-function renderCanvas() {
-  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+// Quantized wet/dry state: wetness only changes the gloss/tint alpha by well
+// under 1/255 per step at this resolution, so recompositing the wall more
+// often than this is invisible - and wasted work.
+function wallFinishState() {
+  if (state.phase === 'drying') return 1 + Math.round(state.dryProgress * 100); // 1..101
+  return state.phase === 'painting' ? 0 : -2;
+}
 
-  ctx.drawImage(textureCanvas, 0, 0);
+function updateWallLayer() {
+  const finishKey = wallFinishState();
+  if (!wallDirty && finishKey === wallFinishKey) return false;
+  wallDirty = false;
+  wallFinishKey = finishKey;
   renderPaintFinish();
-  ctx.drawImage(finishCanvas, 0, 0);
+  wallLayerCtx.drawImage(textureCanvas, 0, 0);
+  wallLayerCtx.drawImage(finishCanvas, 0, 0);
+  wallLayerVersion++;
+  return true;
+}
+let wallLayerVersion = 0;
 
+// Static room furniture, rebuilt only when the round (and so the scene/floor
+// pattern) changes. The existing draw functions target the global `ctx`, so
+// point it at the offscreen layer for the duration of the build.
+function updateOverlayLayer() {
+  if (overlayRound === state.round) return;
+  overlayRound = state.round;
+  const mainCtx = ctx;
+  ctx = overlayLayerCtx;
+  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
   drawEdges();
   drawCeiling();
   drawFloor();
   drawWindow();
+  ctx = mainCtx;
+  overlayVersion++;
+}
+let overlayVersion = 0;
+
+function renderCanvas() {
+  updateWallLayer();
+  updateOverlayLayer();
+  ctx.drawImage(wallLayer, 0, 0);
+  ctx.drawImage(overlayLayer, 0, 0);
+
   drawLight();
   drawPaintTimer();
 
@@ -1496,26 +1796,96 @@ function isCurrentlyWatching() {
   return countingEyePairsAt(state.lastMouse.x, state.lastMouse.y).length > 0;
 }
 
+// Perf: assigning textContent (even an identical string) replaces the text
+// node and dirties layout; the HUD used to do this several times per frame.
+function setText(el, value) {
+  value = String(value);
+  if (el.textContent !== value) el.textContent = value;
+}
+
 function updateWatchStats() {
-  calmHeading.textContent = computeMomentsOfCalm();
-  awayStat.textContent = `${formatMinSec(state.totalAwayMs + state.awayMs)} (${state.totalLookAwayCount + state.lookAwayCount}x)`;
-  roundHeading.textContent = roomSceneName();
+  const spendableCalm = computeMomentsOfCalm();
+  setText(calmHeading, spendableCalm);
+  setText(calmTotal, `Total: ${spendableCalm + state.calmSpent}`);
+  setText(awayStat, `${formatMinSec(state.totalAwayMs + state.awayMs)} (${state.totalLookAwayCount + state.lookAwayCount}x)`);
+  setText(roundHeading, roomSceneName());
   const paintMs = state.phase === 'painting'
     ? Math.max(0, paintTimeLimitForRound(state.round) - (Date.now() - state.paintStartedAt))
     : paintTimeLimitForRound(state.round);
-  roundDetails.textContent = `${state.round} / ${MAX_ROUNDS} · Paint ${formatMinSec(paintMs)} · Dry ${formatMinSec(DRY_DURATION_MS)}`;
+  setText(roundDetails, `${state.round} / ${MAX_ROUNDS} · Paint ${formatMinSec(paintMs)} · Dry ${formatMinSec(dryDurationForRound(state.round))}`);
 }
 
+// Perf: decide whether anything visible changed since the last drawn frame.
+// When the lamp has settled, the pointer is still and nothing else is
+// animating, the canvas is simply not redrawn - the browser keeps showing the
+// previous frame for free. (Drying is mostly exactly that state.)
+const sigPrev = new Float64Array(10);
+const sigNext = new Float64Array(10);
+let sigValid = false;
+function frameChanged(now) {
+  let kind = 0, cx = 0, cy = 0, mask = 0;
+  if ((state.phase === 'painting' || state.phase === 'drying') && state.pointerOverCanvas && state.lastMouse) {
+    kind = (state.phase === 'drying' || state.coveragePercent >= 100) ? 2 : (state.selectedColor ? 1 : 0);
+    cx = Math.round(state.lastMouse.x * 2);
+    cy = Math.round(state.lastMouse.y * 2);
+    if (kind === 2) {
+      const n = eyePairCount();
+      for (let i = 0; i < n; i++) if (state.eyeBlinks[i] && now < state.eyeBlinks[i].until) mask |= 1 << i;
+    }
+  }
+  let timer = -1;
+  if (state.phase === 'painting' && state.paintStartedAt) {
+    const remaining = paintTimeLimitForRound(state.round) - (Date.now() - state.paintStartedAt);
+    timer = remaining <= 0 ? -2 : Math.floor(remaining / 1000);
+  }
+  sigNext[0] = Math.round(state.lightAngle * 1000);
+  sigNext[1] = kind;
+  sigNext[2] = cx;
+  sigNext[3] = cy;
+  sigNext[4] = mask;
+  sigNext[5] = timer;
+  sigNext[6] = eyePairCount();
+  sigNext[7] = state.upgrades.brush;
+  sigNext[8] = state.round;
+  let changed = !sigValid || wallDirty || wallFinishState() !== wallFinishKey;
+  for (let i = 0; i < sigNext.length; i++) {
+    if (sigNext[i] !== sigPrev[i]) changed = true;
+    sigPrev[i] = sigNext[i];
+  }
+  sigValid = true;
+  return changed;
+}
+
+let lastStatsAt = -1e9;
+const STATS_INTERVAL_MS = 250; // HUD text/bars don't need to refresh at display rate
+const IDLE_FRAME_MS = 30;      // ~30fps cap whenever the player isn't actively painting / moving
+let shownDryWidth = -1;
+let shownDryColorStep = -1;
+
 function tick(now) {
+  // Frame cap: full display rate only while painting or while the pointer is
+  // moving; otherwise ~30fps. dt is measured from the last PROCESSED frame, so
+  // game time is unaffected.
+  const fast = state.phase === 'painting' || (now - lastPointerMoveAt) < 300;
+  if (!fast && lastTickTime && now - lastTickTime < IDLE_FRAME_MS) {
+    rafHandle = requestAnimationFrame(tick);
+    return;
+  }
   const dt = lastTickTime ? now - lastTickTime : 0;
   lastTickTime = now;
 
-  updateLightPhysics(dt);
+  // Cap the physics step: after the tab/app has been backgrounded dt can be
+  // many seconds, which would blow up the pendulum integration.
+  updateLightPhysics(Math.min(dt, 50));
 
   if (state.phase === 'drying') {
     // The drying clock itself runs unconditionally - real paint doesn't
     // care whether anyone's looking at it.
-    state.dryProgress = Math.min(1, state.dryProgress + dt / DRY_DURATION_MS);
+    state.dryProgress = Math.min(1, state.dryProgress + dt / dryDurationForRound(state.round));
+    if (now >= nextDryTickAt) {
+      playTick();
+      nextDryTickAt = now + 1000;
+    }
 
     // MOMENTS OF CALM - the player's score. One point per second of
     // wall-clock time spent actually watching the wall dry (mouse over
@@ -1560,6 +1930,7 @@ function tick(now) {
         } else if (now >= blink.until && now >= blink.nextAt) {
           blink.until = now + 150;
           blink.nextAt = blink.until + randomBlinkDelayMs();
+          playPlip();
         }
       }
       for (let i = eyePairCount(); i < state.eyeBlinks.length; i++) {
@@ -1574,20 +1945,35 @@ function tick(now) {
       });
     }
 
-    dryingLabel.textContent = `Drying: ${Math.round(state.dryProgress * 100)}%`;
-    dryingBar.style.width = `${state.dryProgress * 100}%`;
-    if (state.selectedColor) {
-      dryingBar.style.background = dryingBarColor(state.selectedColor.hex, state.dryProgress);
+    // HUD refresh: throttled, and each DOM write only happens when its value
+    // actually changed (bar width in 0.1% steps, colour in 1% steps).
+    if (now - lastStatsAt >= STATS_INTERVAL_MS || state.dryProgress >= 1) {
+      lastStatsAt = now;
+      setText(dryingLabel, `Drying: ${Math.round(state.dryProgress * 100)}%`);
+      const width = Math.round(state.dryProgress * 1000) / 10;
+      if (width !== shownDryWidth) {
+        shownDryWidth = width;
+        dryingBar.style.width = `${width}%`;
+      }
+      const colorStep = Math.round(state.dryProgress * 100);
+      if (state.selectedColor && colorStep !== shownDryColorStep) {
+        shownDryColorStep = colorStep;
+        dryingBar.style.background = dryingBarColor(state.selectedColor.hex, colorStep / 100);
+      }
+      updateWatchStats();
     }
-    updateWatchStats();
 
     if (state.dryProgress >= 1) {
       finishDrying();
     }
+  } else if (state.phase === 'painting' && now - lastStatsAt >= STATS_INTERVAL_MS) {
+    lastStatsAt = now;
+    shownDryWidth = -1; // the bar restarts from 0 next drying phase
+    shownDryColorStep = -1;
+    updateWatchStats();
   }
-  if (state.phase === 'painting') updateWatchStats();
 
-  renderCanvas();
+  if (frameChanged(now)) renderCanvas();
   rafHandle = requestAnimationFrame(tick);
 }
 
@@ -1603,6 +1989,7 @@ function stopRenderLoop() {
 }
 
 function finishDrying() {
+  playDoying();
   stopCaptionRotation();
   state.phase = 'intermission';
   state.totalElapsedMs += state.paintStartedAt ? Date.now() - state.paintStartedAt : 0;
@@ -1610,12 +1997,12 @@ function finishDrying() {
   state.totalAwayMs += state.awayMs;
   state.totalLookAwayCount += state.lookAwayCount;
   const roundCalm = roundWatchingScore() +
-    (state.paintBonusAwarded ? PAINT_TIME_BONUS : 0) - state.lookAwayCount * 5;
+    (state.paintBonusAwarded ? paintTimeBonusForRound(state.round) : 0) - state.lookAwayCount * 5;
   // Calm never goes negative: if look-away penalties would push the balance
   // below 0, cap the round's result so the balance lands exactly on 0.
   const priorBalance = state.totalMomentsOfCalmEarned - state.calmSpent;
   state.totalMomentsOfCalmEarned += Math.max(roundCalm, -priorBalance);
-  state.totalPaintBonus += state.paintBonusAwarded ? PAINT_TIME_BONUS : 0;
+  state.totalPaintBonus += state.paintBonusAwarded ? paintTimeBonusForRound(state.round) : 0;
   state.calmBank = computeMomentsOfCalm();
   if (state.round >= MAX_ROUNDS) {
     state.phase = 'done';
@@ -1627,7 +2014,7 @@ function finishDrying() {
   roundTitle.textContent = `Round ${state.round} complete`;
   roundReward.textContent = state.paintBonusAwarded
     ? 'Fast finish! Your time bonus is included in your Moments of calm.'
-    : `The next wall gives you less time to paint. Drying still takes ${formatMinSec(DRY_DURATION_MS)}.`;
+    : `The next wall gives you less time to paint. Drying will take ${formatMinSec(dryDurationForRound(state.round + 1))}.`;
   renderUpgradeList();
   openRoundSheet(() => { // measures the collapsed panel BEFORE swapping its content
     dryingHud.classList.add('hidden');
@@ -1691,6 +2078,7 @@ function renderUpgradeList() {
       state.calmBank -= cost;
       state.calmSpent += cost;
       state.upgrades[def.id]++;
+      playDing();
       if (def.id === 'eyes') {
         state.eyeSetUpgrades.push({ specs: false, goldenEyes: false, goldSpecs: false });
       } else if (def.id === 'specs' || def.id === 'goldEyes' || def.id === 'goldSpecs') {
@@ -1705,6 +2093,7 @@ function renderUpgradeList() {
 }
 
 function startRound(round) {
+  playPop();
   state.round = round;
   state.phase = 'painting';
   state.paintStartedAt = Date.now();
@@ -1771,6 +2160,7 @@ startPaintingBtn.addEventListener('click', () => {
   sidePanel.classList.remove('hidden');
   paintHud.classList.remove('hidden');
   dryingHud.classList.add('hidden');
+  fitCanvas(true); // stacked layout: make room for the panel below the wall
   startRound(1);
 });
 
@@ -1782,8 +2172,10 @@ function beginDrying() {
   state.paintBonusAwarded = state.paintStartedAt
     ? (Date.now() - state.paintStartedAt) <= paintTimeLimitForRound(state.round)
     : false;
+  if (state.paintBonusAwarded) playKaChing();
   state.phase = 'drying';
   state.dryStartedAt = Date.now();
+  nextDryTickAt = performance.now();
   state.dryProgress = 0;
   state.watchedMs = 0;
   state.awayMs = 0;
@@ -1799,15 +2191,16 @@ function beginDrying() {
 }
 
 function showGameOverScreen() {
+  playDaPaDing();
   const purchasedUpgrades = UPGRADES
     .filter((upgrade) => state.upgrades[upgrade.id] > 0)
     .map((upgrade) => `<li>${escapeHtml(upgrade.name)}: Level ${state.upgrades[upgrade.id]}/${upgradeMaxLevel(upgrade)}</li>`)
     .join('');
   gameOverStats.innerHTML = `
     <p class="score-line">Rounds completed: <strong>${state.round} / ${MAX_ROUNDS}</strong></p>
-    <p class="score-line">Moments of calm: <strong>${computeMomentsOfCalm()}</strong></p>
+    <p class="score-line">Total Moments of calm: <strong>${state.calmBank + state.calmSpent}</strong></p>
+    <p class="score-line">Spendable Moments of calm: <strong>${state.calmBank}</strong></p>
     <p>Moments of calm spent: <strong>${state.calmSpent}</strong></p>
-    <p>Unspent Moments of calm: <strong>${state.calmBank}</strong></p>
     <p>Purchased upgrades:</p>
     ${purchasedUpgrades ? `<ul class="score-upgrades">${purchasedUpgrades}</ul>` : '<p>None</p>'}
     <p>Colour: <strong>${escapeHtml(state.selectedColor ? state.selectedColor.name : 'Unknown')}</strong></p>
