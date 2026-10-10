@@ -42,7 +42,7 @@ html[data-scene="peachjuice"]{--scene-page-bg:#f7f2e8;--scene-surface:#fffdf8;--
 html[data-scene="sunny-blue"]{--scene-page-bg:#e9f0fb;--scene-surface:#ffffff;--scene-text:#17243b;--scene-muted:#4d5b70;--scene-border:#b6c5da;--scene-brand:#172c55;--scene-action:#254eb8;--scene-action-text:#ffffff;--scene-highlight:#ffe36e;--scene-highlight-text:#17243b;--scene-link:#2449a6}
 html[data-scene="peachjuice"] body,html[data-scene="sunny-blue"] body{background:var(--scene-page-bg)!important;color:var(--scene-text)!important}
 html[data-scene="peachjuice"] p,html[data-scene="sunny-blue"] p,html[data-scene="peachjuice"] small,html[data-scene="sunny-blue"] small,html[data-scene="peachjuice"] .subtitle,html[data-scene="sunny-blue"] .subtitle,html[data-scene="peachjuice"] .tagline,html[data-scene="sunny-blue"] .tagline,html[data-scene="peachjuice"] .meta,html[data-scene="sunny-blue"] .meta{color:var(--scene-muted)!important}
-html[data-scene="peachjuice"] h1,html[data-scene="sunny-blue"] h1,html[data-scene="peachjuice"] h2,html[data-scene="sunny-blue"] h2,html[data-scene="peachjuice"] h3,html[data-scene="sunny-blue"] h3,html[data-scene="peachjuice"] .dynamic-logo,html[data-scene="sunny-blue"] .dynamic-logo{color:var(--scene-brand)!important;-webkit-text-fill-color:var(--scene-brand)!important;background:none!important}
+html[data-scene="peachjuice"] h1,html[data-scene="sunny-blue"] h1,html[data-scene="peachjuice"] h2,html[data-scene="sunny-blue"] h2,html[data-scene="peachjuice"] h3,html[data-scene="sunny-blue"] h3{color:var(--scene-brand)!important;-webkit-text-fill-color:var(--scene-brand)!important}
 html[data-scene="peachjuice"] a,html[data-scene="sunny-blue"] a{color:var(--scene-link)!important}
 html[data-scene="peachjuice"] input,html[data-scene="sunny-blue"] input,html[data-scene="peachjuice"] select:not(#pj-scene-select),html[data-scene="sunny-blue"] select:not(#pj-scene-select),html[data-scene="peachjuice"] textarea,html[data-scene="sunny-blue"] textarea{background:var(--scene-surface)!important;color:var(--scene-text)!important;border-color:var(--scene-border)!important}
 html[data-scene="peachjuice"] .screen,html[data-scene="sunny-blue"] .screen,html[data-scene="peachjuice"] .board,html[data-scene="sunny-blue"] .board,html[data-scene="peachjuice"] .game-card,html[data-scene="sunny-blue"] .game-card,html[data-scene="peachjuice"] .overlay-content,html[data-scene="sunny-blue"] .overlay-content,html[data-scene="peachjuice"] #round-complete-panel,html[data-scene="sunny-blue"] #round-complete-panel,html[data-scene="peachjuice"] #stats-bar,html[data-scene="sunny-blue"] #stats-bar,html[data-scene="peachjuice"] .hud-panel,html[data-scene="sunny-blue"] .hud-panel,html[data-scene="peachjuice"] .hud-panel-side,html[data-scene="sunny-blue"] .hud-panel-side,html[data-scene="peachjuice"] .panel,html[data-scene="sunny-blue"] .panel{background:var(--scene-surface)!important;color:var(--scene-text)!important;border-color:var(--scene-border)!important;box-shadow:0 5px 20px rgba(20,35,60,.12)}
@@ -64,3 +64,36 @@ html[data-scene="peachjuice"] #app,html[data-scene="sunny-blue"] #app{--bg:var(-
 html[data-scene="peachjuice"] #site-header p,html[data-scene="sunny-blue"] #site-header p,html[data-scene="peachjuice"] #site-header small,html[data-scene="sunny-blue"] #site-header small,html[data-scene="peachjuice"] .app-header p,html[data-scene="sunny-blue"] .app-header p,html[data-scene="peachjuice"] .app-header .subtitle,html[data-scene="sunny-blue"] .app-header .subtitle{color:#edf4ff!important}
 html[data-scene="peachjuice"] #site-header a,html[data-scene="sunny-blue"] #site-header a,html[data-scene="peachjuice"] .app-header a,html[data-scene="sunny-blue"] .app-header a{color:#ffe36e!important}
 html[data-scene="peachjuice"] #site-header .nav-sep,html[data-scene="sunny-blue"] #site-header .nav-sep{color:#dce6f5!important}
+
+/* Replace the original green logo and action-button glows in both themes. */
+html[data-scene="peachjuice"] .dynamic-logo{ text-shadow:0 4px 24px rgba(150,63,36,.35)!important }
+html[data-scene="sunny-blue"] .dynamic-logo{ text-shadow:0 4px 24px rgba(37,78,184,.35)!important }
+html[data-scene="peachjuice"] .big-action-btn,html[data-scene="peachjuice"] .secondary-action-btn,html[data-scene="peachjuice"] #next-round-btn{box-shadow:0 8px 28px rgba(150,63,36,.4)!important}
+html[data-scene="sunny-blue"] .big-action-btn,html[data-scene="sunny-blue"] .secondary-action-btn,html[data-scene="sunny-blue"] #next-round-btn{box-shadow:0 8px 28px rgba(37,78,184,.4)!important}
+
+
+/* Theme the hub logo gradient while keeping the original proven shimmer animation. */
+
+
+
+
+
+
+
+
+/* Keep themed headings visible while using the shared animated gradient. */
+html[data-scene="peachjuice"] .dynamic-logo{background-image:linear-gradient(90deg,#963f24,#e88362,#f6dfd2,#963f24)!important;background-size:300% 100%!important;background-clip:text!important;-webkit-background-clip:text!important;color:transparent!important;-webkit-text-fill-color:transparent!important;animation:logo-shimmer 5s ease-in-out infinite!important}
+html[data-scene="sunny-blue"] .dynamic-logo{background-image:linear-gradient(90deg,#172c55,#4169e1,#ffe36e,#172c55)!important;background-size:300% 100%!important;background-clip:text!important;-webkit-background-clip:text!important;color:transparent!important;-webkit-text-fill-color:transparent!important;animation:logo-shimmer 5s ease-in-out infinite!important}
+
+/* Theme colors only: keep background-position controlled by logo-shimmer. */
+html[data-scene="peachjuice"] .dynamic-logo{background-image:linear-gradient(90deg,#963f24,#e88362,#f6dfd2,#963f24);background-size:300% 100%;background-clip:text;-webkit-background-clip:text;color:transparent;-webkit-text-fill-color:transparent;animation:logo-shimmer 5s ease-in-out infinite}
+html[data-scene="sunny-blue"] .dynamic-logo{background-image:linear-gradient(90deg,#172c55,#4169e1,#ffe36e,#172c55);background-size:300% 100%;background-clip:text;-webkit-background-clip:text;color:transparent;-webkit-text-fill-color:transparent;animation:logo-shimmer 5s ease-in-out infinite}
+
+/* Theme overrides only the gradient stops; logo layout and shimmer stay original. */
+html[data-scene="peachjuice"] .dynamic-logo{background-image:linear-gradient(90deg,#963f24,#e88362,#f6dfd2,#963f24)}
+html[data-scene="sunny-blue"] .dynamic-logo{background-image:linear-gradient(90deg,#172c55,#4169e1,#ffe36e,#172c55)}
+
+/* Restore theme-colored glows on home-page action buttons. */
+html[data-scene="peachjuice"] .big-action-btn{box-shadow:0 8px 28px rgba(150,63,36,.4)!important}
+html[data-scene="sunny-blue"] .big-action-btn{box-shadow:0 8px 28px rgba(37,78,184,.4)!important}
+

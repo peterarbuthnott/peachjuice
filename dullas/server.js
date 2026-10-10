@@ -278,12 +278,10 @@ function handlePostScore(req, res) {
       totalPlatesSpent: body.totalPlatesSpent || 0,
       // Added for the highscores page's leaderboards (see
       // handleGetLeaderboards below) - platesEarned is lifetime currency
-      // earned this run, timeTakenMs is the run's total wall-clock
-      // duration. Both are optional: older game.js builds won't send
-      // them, so they default to 0/null and that run is just excluded
-      // from the leaderboards that need them.
+      // earned this run, roundTimeTakenMs is the sum of time spent in
+      // completed rounds. Both are optional for older game.js builds.
       platesEarned: typeof body.platesEarned === 'number' ? body.platesEarned : 0,
-      timeTakenMs: typeof body.timeTakenMs === 'number' ? body.timeTakenMs : null,
+      roundTimeTakenMs: typeof body.roundTimeTakenMs === 'number' ? body.roundTimeTakenMs : null,
       upgrades: body.upgrades || {},
       reason: typeof body.reason === 'string' ? body.reason : null,
       submittedAt: isoTimestamp(),
@@ -340,7 +338,7 @@ var REASON_PLAYER_FINISH_PREFIX = 'You chose to finish after round ';
 
 // Builds one ranked board for a single metric.
 // Every qualifying run is eligible; runs without a finite metric (such as
-// older runs that predate timeTakenMs) are skipped rather than sorted as 0.
+// older runs without recoverable per-round timing are skipped rather than sorted as 0.
 function rankTop(entries, metricFn, higherIsBetter, formatFn) {
   var candidates = [];
   for (var i = 0; i < entries.length; i++) {
@@ -370,12 +368,79 @@ function rankTop(entries, metricFn, higherIsBetter, formatFn) {
 // (least to most - lower is better), plates earned (most to least),
 // plates cleaned (most to least), golden plates (most to least).
 function buildCategoryLeaderboards(entries) {
+  var eventRows = readLines(EVENTS_FILE);
+  var timeEntries = [];
+  for (var i = 0; i < entries.length; i++) {
+    var entry = entries[i];
+    var elapsed = typeof entry.roundTimeTakenMs === 'number'
+      ? entry.roundTimeTakenMs
+      : findRoundTimeFromEvents(entry, eventRows);
+    if (elapsed !== null) {
+      var timedEntry = {};
+      for (var key in entry) if (Object.prototype.hasOwnProperty.call(entry, key)) timedEntry[key] = entry[key];
+      timedEntry.timeTakenMs = elapsed;
+      timeEntries.push(timedEntry);
+    }
+  }
   return {
-    timeTaken: rankTop(entries, function (e) { return e.timeTakenMs; }, false, formatHms),
+    timeTaken: rankTop(timeEntries, function (e) { return e.timeTakenMs; }, false, formatHms),
     platesEarned: rankTop(entries, function (e) { return e.platesEarned || 0; }, true, null),
     platesCleaned: rankTop(entries, function (e) { return e.totalPlatesWashed || 0; }, true, null),
     goldenPlates: rankTop(entries, function (e) { return e.goldenPlatesWashed || 0; }, true, null),
   };
+}
+
+// Older score rows stored whole-run wall-clock time. Rebuild their active
+// round time from the matching archived run events where possible.
+function parseElapsedHms(value) {
+  if (typeof value !== 'string') return null;
+  var parts = value.split(':');
+  if (parts.length !== 3) return null;
+  var hours = Number(parts[0]);
+  var minutes = Number(parts[1]);
+  var seconds = Number(parts[2]);
+  if (!isFinite(hours) || !isFinite(minutes) || !isFinite(seconds)) return null;
+  return ((hours * 60 + minutes) * 60 + seconds) * 1000;
+}
+
+function findRoundTimeFromEvents(score, rows) {
+  var bestEnd = null;
+  var bestDistance = Infinity;
+  var submittedAt = Date.parse(score.submittedAt);
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var event = row.event || {};
+    if (event.type !== 'run_end' || event.playerId !== score.playerId) continue;
+    if (event.reason !== score.reason || event.round !== score.round) continue;
+    if (event.totalPlatesWashed !== score.totalPlatesWashed) continue;
+    if (event.goldenPlatesWashed !== score.goldenPlatesWashed) continue;
+    if (event.totalPlatesSpent !== score.totalPlatesSpent) continue;
+    var endedAt = Date.parse(event.timestamp || row.receivedAt);
+    var distance = isFinite(submittedAt) && isFinite(endedAt) ? Math.abs(submittedAt - endedAt) : i;
+    if (distance < bestDistance) {
+      bestEnd = row;
+      bestDistance = distance;
+    }
+  }
+  if (!bestEnd) return null;
+
+  var runId = bestEnd.runId || (bestEnd.event && bestEnd.event.runId);
+  if (!runId) return null;
+  var total = 0;
+  var found = false;
+  for (var j = 0; j < rows.length; j++) {
+    var roundRow = rows[j];
+    var roundEvent = roundRow.event || {};
+    if (roundEvent.type !== 'round_complete' || roundEvent.playerId !== score.playerId) continue;
+    if ((roundRow.runId || roundEvent.runId) !== runId) continue;
+    var roundMs = typeof roundEvent.elapsedMs === 'number'
+      ? roundEvent.elapsedMs
+      : parseElapsedHms(roundEvent.elapsed);
+    if (roundMs === null) continue;
+    total += roundMs;
+    found = true;
+  }
+  return found ? total : null;
 }
 
 // Live, uncached read of highscores.ndjson on every single request - never
@@ -443,7 +508,9 @@ function requestHandler(req, res) {
   if (req.method === 'GET' && urlPath === '/api/highscores') { handleGetHighscores(req, res); return; }
   if (req.method === 'GET' && urlPath === '/api/leaderboards') { handleGetLeaderboards(req, res); return; }
   if (req.method === 'POST' && urlPath === '/api/events') { handlePostEvents(req, res); return; }
-  if (req.method === 'GET') { serveStatic(req, res); return; }
+  // HEAD must be served too (Node strips the body automatically) - crawlers
+  // and validators such as AdSense's ads.txt checker probe with HEAD first.
+  if (req.method === 'GET' || req.method === 'HEAD') { serveStatic(req, res); return; }
   sendJson(res, 404, { error: 'Not found' });
 }
 

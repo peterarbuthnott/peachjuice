@@ -42,6 +42,11 @@ html, body {
   background: rgba(0, 0, 0, 0.15);
 }
 
+.footer-guide-links a { color: inherit; text-decoration: underline; }
+
+.skyscraper-ad:first-child { margin-right: 150px; }
+.skyscraper-ad:last-child { margin-left: 150px; }
+
 /* Below this width, showing 160px-wide ad columns on both sides would
    crowd out the game itself - hide them and let #game-wrap's flex:1 take
    the full width instead, same as if the ads weren't there at all. */
@@ -58,6 +63,11 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
+  /* Backstop for #round-complete-panel, which is absolutely positioned
+     inside this element - see that rule's comment. Its own max-height +
+     overflow-y:auto should keep it on-screen already; this just gives the
+     browser a scroll container to fall back on if it somehow doesn't. */
+  overflow-y: auto;
 }
 
 #game-canvas {
@@ -78,18 +88,29 @@ html, body {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   background: rgba(20, 30, 35, 0.92);
   color: #fff;
-  padding: 32px 48px;
+  width: min(560px, calc(100vw - 24px));
+  padding: clamp(12px, 2.5vh, 24px) clamp(16px, 3.5vw, 40px);
   border-radius: 14px;
   text-align: center;
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
-  min-width: 280px;
-  max-width: 92vw;
+  max-height: calc(100vh - 16px);
+  max-height: calc(100dvh - 16px);
+  overflow: hidden;
 }
-
+/* Keep the round-end panel laid out while it is invisible so the ad slot
+   retains its dimensions between rounds. The flex layout also keeps the
+   stats and actions ahead of the ad in the visible panel. */
 #round-complete-panel.hidden {
-  display: none;
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  visibility: hidden !important;
+  pointer-events: none;
 }
 
 #round-complete-panel h2 {
@@ -99,14 +120,14 @@ html, body {
 }
 
 #round-complete-panel p {
-  margin: 0 0 20px;
-  font-size: 16px;
+  margin: 0 0 clamp(5px, 1vh, 10px);
+  font-size: clamp(14px, 2vh, 16px);
   color: #e0e0e0;
 }
 
 #round-complete-bonus {
-  margin-top: -12px;
-  font-size: 14px;
+  margin-top: -4px;
+  font-size: clamp(12px, 1.8vh, 14px);
   color: #9fd8b8;
 }
 
@@ -117,7 +138,9 @@ html, body {
 .medium-rectangle-ad {
   width: 300px;
   max-width: 100%;
-  margin: 4px auto 20px;
+  max-height: min(250px, 26dvh);
+  margin: 150px auto 10px;
+  overflow: hidden;
 }
 
 #next-round-btn {
@@ -136,8 +159,19 @@ html, body {
   background: #5ac48f;
 }
 
+#finish-run-btn {
+  display: block;
+  margin: clamp(6px, 1vh, 10px) auto 0;
+}
+
 #next-round-btn:active {
   transform: scale(0.97);
+}
+
+.round-complete-exit-link {
+  display: block;
+  margin: clamp(6px, 1vh, 10px) 0 0;
+  text-align: center;
 }
 
 /* The Upgrades panel now renders directly on the canvas (see
@@ -164,6 +198,14 @@ html, body {
   background: radial-gradient(circle at 50% 35%, #3d5866 0%, #24363f 70%, #1a2830 100%);
   opacity: 1;
   transition: opacity 0.35s ease;
+  /* Backstop only - .overlay-content below is capped to fit the viewport
+     and scrolls its own content, so this container shouldn't normally need
+     to scroll itself. Kept here anyway in case a browser's dvh support or
+     an extreme text-zoom setting still leaves .overlay-content taller than
+     this box; without it, that leftover overflow would be centered right
+     off both the top and bottom edges with no way to reach it (a plain
+     fixed+flex-centered box doesn't scroll on its own). */
+  overflow-y: auto;
 }
 
 /* Briefly fading out (see revealGameArea() in game.js) rather than
@@ -180,6 +222,18 @@ html, body {
   text-align: center;
   padding: 32px;
   color: #fff;
+  /* Same fix as #round-complete-panel: cap this box to fit the visible
+     viewport (dvh preferred, vh fallback for older browsers - see that
+     rule's comment for why) and let ITS OWN content scroll once it no
+     longer fits, rather than letting the box grow taller than the screen.
+     The splash screen (long game-summary text + player-name form) and the
+     game-over screen (stats + upgrade list + highscore board) are the two
+     places this was actually being hit on short mobile screens. */
+  max-height: 90vh;
+  max-height: 90dvh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .dynamic-logo {
@@ -283,5 +337,98 @@ html, body {
   margin: 4px 0 0;
   padding: 0;
   font-size: 14px;
+  color: #cfe8ff;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Player name entry (splash screen) + highscore list (game-over screen). */
+/* Both talk to the lightweight Pi server's /api routes - see game.js.    */
+/* ---------------------------------------------------------------------- */
+
+.player-name-block {
+  margin: 0 0 20px;
+  font-size: 14px;
+  color: #cfe8ff;
+}
+
+.player-name-label {
+  display: block;
+  margin-bottom: 8px;
+  color: #9fb4bd;
+}
+
+.player-name-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+#player-name-input {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1.5px solid rgba(207, 232, 255, 0.35);
+  border-radius: 8px;
+  color: #fff;
+  padding: 8px 12px;
+  font-size: 14px;
+  width: 180px;
+}
+
+#player-name-input:focus {
+  outline: none;
+  border-color: rgba(207, 232, 255, 0.8);
+}
+
+.tiny-action-btn {
+  background: #4caf7d;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tiny-action-btn:hover {
+  background: #5ac48f;
+}
+
+.tiny-link-btn {
+  background: none;
+  border: none;
+  color: #6fc7ff;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+  margin-left: 8px;
+  padding: 0;
+}
+
+#highscore-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.highscore-title {
+  margin: 0 0 8px !important;
+  font-weight: 600;
+  color: #ffd166;
+}
+
+#highscore-list {
+  list-style: decimal;
+  margin: 0;
+  padding: 0 0 0 24px;
+  text-align: left;
+  font-size: 14px;
+  color: #e0e0e0;
+  line-height: 1.7;
+  max-width: 320px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+#highscore-list li strong {
   color: #cfe8ff;
 }

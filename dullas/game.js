@@ -43,6 +43,7 @@ const roundCompleteCleaned = document.getElementById('round-complete-cleaned');
 const roundCompleteEarned = document.getElementById('round-complete-earned');
 const roundCompleteBonus = document.getElementById('round-complete-bonus');
 const nextRoundBtn = document.getElementById('next-round-btn');
+const finishRunBtn = document.getElementById('finish-run-btn');
 
 const splashScreen = document.getElementById('splash-screen');
 const startWashingBtn = document.getElementById('start-washing-btn');
@@ -50,6 +51,15 @@ const continueBtn = document.getElementById('continue-btn');
 const gameOverScreen = document.getElementById('game-over-screen');
 const gameOverReasonEl = document.getElementById('game-over-reason');
 const gameOverStatsEl = document.getElementById('game-over-stats');
+const highscoreSection = document.getElementById('highscore-section');
+const highscoreList = document.getElementById('highscore-list');
+
+const playerNameEntry = document.getElementById('player-name-entry');
+const playerNameInput = document.getElementById('player-name-input');
+const playerNameSaveBtn = document.getElementById('player-name-save-btn');
+const playerNameDisplay = document.getElementById('player-name-display');
+const playerNameCurrentEl = document.getElementById('player-name-current');
+const playerNameChangeBtn = document.getElementById('player-name-change-btn');
 
 // ============================================================================
 // AUDIO: every sound effect is synthesised on the fly with the Web Audio
@@ -327,6 +337,7 @@ function ensureStackSpace() {
       state.stacks.shift(); // clear the lowest (oldest) stack - it's gone, not just hidden
     }
     state.stacks.push([]);
+    stacksLayerDirty = true;
     const bonus = STACK_FILL_BONUS_PLATES * NORMAL_REWARD * state.rewardMultiplier;
     state.platesCleaned += bonus;
     state.roundCurrencyEarned += bonus;
@@ -412,10 +423,9 @@ function currentGoldenChance() {
   return Math.min(GOLDEN_CHANCE_CAP, BASE_GOLDEN_CHANCE + level * GOLDEN_CHANCE_PER_LEVEL);
 }
 
-// Speed bonus: round 1's 5 plates need to be finished in under a minute,
-// which works out to a 12-second-per-plate budget. Bigger rounds (from the
-// "extra dishes" upgrade, or just later rounds) get proportionally more
-// time. Both this and the stack-fill bonus are expressed as a number of
+// Speed bonus: finish a round within a 12-second-per-plate budget. Bigger
+// rounds (from the "extra dishes" upgrade, or just later rounds) get
+// proportionally more time. Both this and the stack-fill bonus are expressed as a number of
 // plates, then converted to currency at the CURRENT plates-per-plate rate.
 const TIME_BONUS_SECONDS_PER_PLATE = 12;
 const TIME_BONUS_PAYOUT_FRACTION = 0.5; // 50% of the round's plate count, as a plate bonus
@@ -436,6 +446,28 @@ function formatMinSec(ms) {
   const mins = Math.floor(totalSeconds / 60);
   const secs = totalSeconds % 60;
   return `${mins}m ${secs}s`;
+}
+
+// Standardised timestamp format for anything written to a log (telemetry
+// events, save snapshots) - YYYY-MM-DDTHH:MM:SS, always UTC, with no
+// fractional seconds since nothing reading these logs back will ever care
+// about sub-second precision. toISOString() already produces exactly this
+// shape plus a trailing ".mmmZ", so this just trims that off.
+function isoTimestamp(date) {
+  return (date || new Date()).toISOString().slice(0, 19);
+}
+
+// Standardised duration format for anything logging a time DIFFERENCE
+// between two events (how long an upgrade sat available before being
+// bought, how long a round took) rather than an absolute point in time -
+// HH:MM:SS, since none of this logging needs sub-second resolution either.
+function formatHms(ms) {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const mins = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
 }
 
 // Plates cleaned in the last real-time (game-clock) minute: trims
@@ -715,7 +747,7 @@ function samplePercentClear(sourceCanvas, sampleCtx, invert = false) {
 // How many total plates a given round has (base curve, before the
 // "extra dishes" upgrade doubles it - see platesForRound()).
 function baselinePlatesForRound(round) {
-  return round + 4; // round 1 = 5 plates, +1 plate per round after that
+  return round === 1 ? 1 : round + 4; // round 1 = 1 plate; rounds 2+ add one plate each
 }
 
 // Hard safety cap on plates in any single round, regardless of what the
@@ -750,8 +782,10 @@ function platesForRound(round) {
 // ============================================================================
 const STORAGE_KEYS = {
   playerId: 'dullasDishwater.playerId',
+  playerName: 'dullasDishwater.playerName',
   save: 'dullasDishwater.save.v1',
   events: 'dullasDishwater.events.v1',
+  lastSyncedEventCount: 'dullasDishwater.lastSyncedEventCount',
 };
 const MAX_STORED_EVENTS = 2000; // oldest events are dropped once this cap is hit
 
@@ -770,6 +804,17 @@ function getOrCreatePlayerId() {
   return id;
 }
 
+// Player name for the highscore board - asked once on the splash screen
+// (see initPlayerNameUI()), reused for every future run. Entirely separate
+// from playerId (the anonymous UUID used for save/resume and telemetry);
+// this is just a display label.
+function getPlayerName() {
+  try { return localStorage.getItem(STORAGE_KEYS.playerName); } catch (e) { return null; }
+}
+function setPlayerName(name) {
+  try { localStorage.setItem(STORAGE_KEYS.playerName, name); } catch (e) { /* best effort only */ }
+}
+
 // Appends one telemetry event (run start/resume/end, round-complete, or
 // upgrade purchase) to a capped local log - the raw material for tuning the
 // game later. Best-effort: if localStorage is unavailable or full, events
@@ -785,6 +830,18 @@ function logEvent(event) {
   try { localStorage.setItem(STORAGE_KEYS.events, JSON.stringify(events)); } catch (e) { /* best effort */ }
 }
 
+// Reads the full local event log as-is (same storage logEvent() writes to) -
+// used by syncEventsToServer() below, kept separate from logEvent() so
+// reading never risks accidentally mutating the stored log.
+function loadAllEvents() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.events);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
 // Saved at every round-complete and every purchase - just enough to
 // reconstruct currency/upgrades/stacks and restart the round the player
 // was on. Versioned so a future schema change can detect and ignore old saves.
@@ -793,7 +850,12 @@ function saveSnapshot() {
     version: 1,
     playerId: state.playerId,
     runId: state.runId,
-    round: state.round,
+    runStartedAt: state.runStartedAt,
+    roundTimeTakenMs: state.roundTimeTakenMs,
+    // A completed round is a checkpoint for the next round. This also
+    // keeps purchases made on the round-complete screen from moving the
+    // Continue save back to the round the player has already finished.
+    round: state.roundComplete ? state.round + 1 : state.round,
     platesCleaned: state.platesCleaned,
     totalPlatesWashed: state.totalPlatesWashed,
     goldenPlatesWashed: state.goldenPlatesWashed,
@@ -803,7 +865,7 @@ function saveSnapshot() {
     scrubEfficiency: state.scrubEfficiency,
     rewardMultiplier: state.rewardMultiplier,
     stacks: state.stacks.map((s) => [...s]),
-    savedAt: Date.now(),
+    savedAt: isoTimestamp(),
   };
   try { localStorage.setItem(STORAGE_KEYS.save, JSON.stringify(snapshot)); } catch (e) { /* best effort */ }
 }
@@ -823,6 +885,20 @@ function clearSnapshot() {
   try { localStorage.removeItem(STORAGE_KEYS.save); } catch (e) { /* best effort */ }
 }
 
+// Wipes the local telemetry log outright - called once a run restarts or
+// ends, since that log's contents belong to a run that's now over. Also
+// removes lastSyncedEventCount: that value is an INDEX into the events
+// array, so leaving a stale (larger) index in place after the array is
+// emptied would make the next sync think the new run's first batch of
+// events had already been sent, silently dropping them. Deliberately
+// leaves playerId, playerName, and the save snapshot untouched - those are
+// what let a returning player keep their identity and resumable game;
+// only the append-only event log is being reset here.
+function clearEvents() {
+  try { localStorage.removeItem(STORAGE_KEYS.events); } catch (e) { /* best effort */ }
+  try { localStorage.removeItem(STORAGE_KEYS.lastSyncedEventCount); } catch (e) { /* best effort */ }
+}
+
 // Copies a saved snapshot into live state. Deliberately does NOT try to
 // restore progress on the plate that was mid-scrub when the snapshot was
 // taken - startRound() is called right after this (see the Continue button
@@ -830,6 +906,10 @@ function clearSnapshot() {
 // resumes into.
 function applySnapshotToState(snapshot) {
   state.runId = snapshot.runId || state.runId;
+  // Retained for compatibility with older saved snapshots; round timing is
+  // now tracked cumulatively in roundTimeTakenMs.
+  state.runStartedAt = snapshot.runStartedAt || null;
+  state.roundTimeTakenMs = typeof snapshot.roundTimeTakenMs === 'number' ? snapshot.roundTimeTakenMs : 0;
   state.round = snapshot.round;
   state.platesCleaned = snapshot.platesCleaned;
   state.totalPlatesWashed = snapshot.totalPlatesWashed;
@@ -840,6 +920,152 @@ function applySnapshotToState(snapshot) {
   state.scrubEfficiency = snapshot.scrubEfficiency;
   state.rewardMultiplier = snapshot.rewardMultiplier;
   state.stacks = snapshot.stacks && snapshot.stacks.length ? snapshot.stacks.map((s) => [...s]) : [[]];
+  stacksLayerDirty = true;
+  invalidateUpgradeTextCache();
+}
+
+// ============================================================================
+// BACKEND SYNC: talks to the lightweight Pi server (see server.js) for the
+// highscore board and centralized telemetry archive. Every call here is
+// best-effort - wrapped so a missing/unreachable server (no Pi on the
+// network, testing via a local file, offline dev) never breaks the game
+// itself, exactly like the localStorage helpers above already tolerate a
+// full/unavailable localStorage. Nothing here changes what's stored
+// locally - it's purely an additional "also send a copy" step.
+// ============================================================================
+function postJson(url, data) {
+  return fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).catch(() => null); // server unreachable - silently give up
+}
+
+// Submits this run's final result for the highscore board. Called once from
+// showGameOverScreen().
+//
+// Two extra fields feed the highscores page's leaderboards (see server.js's
+// /api/leaderboards) beyond what was already tracked here:
+//   - platesEarned: lifetime currency earned this run - not separately
+//     tracked in state, but exactly equal to what's been spent plus what's
+//     still unspent, so it's just totalPlatesSpent + platesCleaned.
+//   - timeTakenMs: sum of the time spent in each completed round. Time between
+//     rounds, pauses, and time away from the game are not included.
+function submitScore(reason) {
+  postJson('/api/score', {
+    playerId: state.playerId,
+    name: getPlayerName() || 'Anonymous',
+    round: state.round,
+    totalPlatesWashed: state.totalPlatesWashed,
+    goldenPlatesWashed: state.goldenPlatesWashed,
+    totalPlatesSpent: state.totalPlatesSpent,
+    platesEarned: state.totalPlatesSpent + state.platesCleaned,
+    roundTimeTakenMs: state.roundTimeTakenMs,
+    upgrades: { ...state.upgrades },
+    reason,
+  });
+}
+
+// Sends only the events logged since the last successful sync (tracked via
+// STORAGE_KEYS.lastSyncedEventCount), so the same history isn't re-sent
+// wholesale every single call - the server-side events.ndjson file stays a
+// clean append of genuinely new events. Called from both the Start Washing
+// handler (restart) and showGameOverScreen() (end of run) - in both cases
+// specifically so a run that's only being abandoned or ended still gets
+// its telemetry (including partially-completed runs) onto the server, not
+// just runs that reach a normal game-over.
+//
+// Returns true if there was nothing to send, or the send succeeded; false
+// if there were new events but the request failed (offline, Pi server
+// down/unreachable). Callers use this to decide whether it's safe to wipe
+// the local log yet - see clearEvents()'s call sites. Returning false
+// without touching STORAGE_KEYS.lastSyncedEventCount or the log itself
+// means the exact same events are retried at the NEXT restart or
+// game-over, so a temporary network blip doesn't silently lose a player's
+// partial-run data - it just waits for the next opportunity to sync.
+async function syncEventsToServer() {
+  const allEvents = loadAllEvents();
+  let lastSynced = 0;
+  try {
+    lastSynced = parseInt(localStorage.getItem(STORAGE_KEYS.lastSyncedEventCount), 10) || 0;
+  } catch (e) { lastSynced = 0; }
+
+  const newEvents = allEvents.slice(lastSynced);
+  if (newEvents.length === 0) return true;
+
+  const res = await postJson('/api/events', {
+    playerId: state.playerId,
+    runId: state.runId,
+    events: newEvents,
+  });
+  if (res && res.ok) {
+    try { localStorage.setItem(STORAGE_KEYS.lastSyncedEventCount, String(allEvents.length)); } catch (e) { /* best effort */ }
+    return true;
+  }
+  return false;
+}
+
+// Fetches the top-10 board and renders it into #highscore-list. Leaves
+// #highscore-section hidden (its default state in index.html) if the
+// server can't be reached at all, so the game-over screen looks exactly as
+// it did before this feature existed when there's no Pi to talk to.
+async function fetchHighscores() {
+  try {
+    const res = await fetch('/api/highscores?limit=10');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.scores || !data.scores.length) return;
+
+    highscoreList.innerHTML = data.scores
+      .map((s) => `<li><strong>${escapeHtml(s.name)}</strong> - Round ${s.round}, ${s.totalPlatesWashed} plates</li>`)
+      .join('');
+    highscoreSection.classList.remove('hidden');
+  } catch (e) {
+    // Server unreachable - leave the section hidden.
+  }
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// ----------------------------------------------------------------------------
+// Player name entry (splash screen) - asked once, reused for every future
+// run, changeable via the small "change" link. Purely a display label for
+// the highscore board; has no effect on playerId/save/telemetry.
+// ----------------------------------------------------------------------------
+function refreshPlayerNameUI() {
+  const name = getPlayerName();
+  if (name) {
+    playerNameCurrentEl.textContent = name;
+    playerNameDisplay.classList.remove('hidden');
+    playerNameEntry.classList.add('hidden');
+  } else {
+    playerNameDisplay.classList.add('hidden');
+    playerNameEntry.classList.remove('hidden');
+  }
+}
+
+function initPlayerNameUI() {
+  refreshPlayerNameUI();
+
+  playerNameSaveBtn.addEventListener('click', () => {
+    const name = playerNameInput.value.trim();
+    if (!name) return;
+    setPlayerName(name);
+    refreshPlayerNameUI();
+  });
+  playerNameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') playerNameSaveBtn.click();
+  });
+  playerNameChangeBtn.addEventListener('click', () => {
+    playerNameInput.value = getPlayerName() || '';
+    playerNameDisplay.classList.add('hidden');
+    playerNameEntry.classList.remove('hidden');
+    playerNameInput.focus();
+  });
 }
 
 // ----------------------------------------------------------------------------
@@ -860,6 +1086,7 @@ const state = {
   rewardMultiplier: 1, // multiplies currency earned per plate; raised by "plates per plate"
   roundComplete: false,
   roundStartTime: 0, // performance.now() when the current round began, for the speed bonus
+  roundTimeTakenMs: 0, // sum of elapsed time in completed rounds for the time leaderboard
   roundTotalPlates: 0, // total plates in the current round, captured at round start
   roundPlatesWashed: 0, // plates washed so far THIS round only, reset each round
   roundCurrencyEarned: 0, // currency earned so far THIS round only (incl. bonuses)
@@ -882,11 +1109,24 @@ const state = {
 
   playerId: getOrCreatePlayerId(), // stable anonymous ID, persisted in localStorage - see PERSISTENCE section above
   runId: null, // set when a run starts/resumes, see the Start Washing / Continue handlers near the bottom of the file
+  runStartedAt: null, // legacy snapshot field; leaderboard timing uses roundTimeTakenMs
   upgradeUnlockedAt: {}, // upgrade id -> performance.now() when it first unlocked, see updateUpgradeAvailabilityTracking()
   upgradeAffordableAt: {}, // upgrade id -> performance.now() when currency first covered its CURRENT cost
 };
 
 // ----------------------------------------------------------------------------
+// Offscreen layers for content that changes only at explicit game events.
+let backgroundLayerCanvas = null;
+let stackPileLayerCanvas = null;
+let stackPileLayerDirty = true;
+let stacksLayerCanvas = null;
+let stacksLayerDirty = true;
+const upgradeTextCache = [];
+function invalidateUpgradeTextCache(index) {
+  if (index == null) upgradeTextCache.length = 0;
+  else upgradeTextCache[index] = null;
+}
+
 // Upgrades: each entry is purchasable with plates (the currency). Cost
 // multiplies by def.costMultiplier (default 2x, i.e. doubling) every time
 // that same upgrade is bought again. An entry with isMaxed() shows FULL and
@@ -896,22 +1136,37 @@ const state = {
 // always shown in the panel, even before it unlocks - locked ones are just
 // dimmed and can't be bought yet.
 // ----------------------------------------------------------------------------
+// Larger Sponge: radius grows by a constant per-level factor chosen so that
+// level 10 (its max) lands the sponge radius exactly on PLATE_RADIUS - i.e.
+// 100% of the plate's AREA, not its diameter. Coverage is what actually
+// matters for scrubbing, and area scales with radius squared, so a sponge
+// at 50% of the plate's width only covers 25% of its area - showing area
+// directly avoids that misleading impression.
+const LARGER_SPONGE_START_RADIUS = 34;
+const LARGER_SPONGE_MAX_LEVEL = 10;
+const LARGER_SPONGE_GROWTH_FACTOR = Math.pow(PLATE_RADIUS / LARGER_SPONGE_START_RADIUS, 1 / LARGER_SPONGE_MAX_LEVEL);
+
+function largerSpongeRadiusForLevel(level) {
+  return Math.min(PLATE_RADIUS, LARGER_SPONGE_START_RADIUS * Math.pow(LARGER_SPONGE_GROWTH_FACTOR, level));
+}
+
 const UPGRADE_DEFS = [
   {
     id: 'largerSponge',
     name: 'Larger Sponge',
-    description: '+20% sponge size',
+    description: 'Grows sponge coverage area toward the whole plate - 100% of plate area at level 10',
     baseCost: 5,
-    maxLevel: 11,
-    apply: () => { state.spongeRadius = Math.min(PLATE_RADIUS, state.spongeRadius * 1.2); },
-    isMaxed: () => (state.upgrades.largerSponge || 0) >= 11,
+    maxLevel: LARGER_SPONGE_MAX_LEVEL,
+    apply: () => { state.spongeRadius = largerSpongeRadiusForLevel(state.upgrades.largerSponge || 0); },
+    isMaxed: () => (state.upgrades.largerSponge || 0) >= LARGER_SPONGE_MAX_LEVEL,
     // Recomputed from the level (rather than reading the mutated
     // state.spongeRadius directly) so the buy button can preview the
     // post-purchase value by passing levelOverride = level + 1.
     currentValueLabel: (levelOverride) => {
       const lvl = levelOverride != null ? levelOverride : (state.upgrades.largerSponge || 0);
-      const radius = Math.min(PLATE_RADIUS, 34 * Math.pow(1.2, lvl));
-      return `${Math.round((radius / PLATE_RADIUS) * 100)}% of plate size`;
+      const radius = largerSpongeRadiusForLevel(lvl);
+      const areaPercent = Math.pow(radius / PLATE_RADIUS, 2) * 100;
+      return `${Math.round(areaPercent)}% of plate area`;
     },
   },
   {
@@ -933,14 +1188,32 @@ const UPGRADE_DEFS = [
   {
     id: 'doublePlates',
     name: 'Extra Dishes',
-    description: 'Adds one more full round\'s worth of plates each level (from next round on, capped at 500/round)',
+    description: 'Adds more plates to the next round (capped at 500/round total)',
     baseCost: 50,
     maxLevel: 10,
     apply: () => { /* platesForRound() reads state.upgrades.doublePlates directly */ },
     isMaxed: () => (state.upgrades.doublePlates || 0) >= 10,
-    currentValueLabel: (levelOverride) => {
+    // Shows the actual plate count this buys, in plain terms, rather than
+    // the underlying multiplier math: how many MORE plates the next round
+    // will have at this level, versus the unupgraded (level 0) baseline for
+    // that same round - already accounting for the 500/round cap, so the
+    // number shown is always exactly what you get.
+    //
+    // Two different phrasings share this one number: the "Current" line
+    // wants the full "X extra plates per round" sentence, but that's too
+    // long once it's also wrapped in the button's "Buy ... for N plates"
+    // template - measured against the button's fixed width, it was
+    // overflowing. forButtonLabel switches to the shorter "X more" for that
+    // call site; drawUpgradesPanel() passes level + 1 and true together for
+    // the buy-preview call.
+    currentValueLabel: (levelOverride, forButtonLabel) => {
       const lvl = levelOverride != null ? levelOverride : (state.upgrades.doublePlates || 0);
-      return `${1 + lvl}x plates/round`;
+      const nextRound = state.round + 1;
+      const baseline = baselinePlatesForRound(nextRound);
+      const atLevel = Math.min(MAX_PLATES_PER_ROUND, baseline * (1 + lvl));
+      const atBaseline = Math.min(MAX_PLATES_PER_ROUND, baseline);
+      const delta = atLevel - atBaseline;
+      return forButtonLabel ? `${delta} more` : `${delta} extra plates per round`;
     },
   },
   {
@@ -992,6 +1265,7 @@ function buyUpgrade(def, index) {
   state.totalPlatesSpent += cost;
   state.upgrades[def.id] = (state.upgrades[def.id] || 0) + 1;
   def.apply();
+  invalidateUpgradeTextCache(index);
 
   logEvent({
     type: 'upgrade_purchase',
@@ -1000,13 +1274,13 @@ function buyUpgrade(def, index) {
     upgradeId: def.id,
     level: state.upgrades[def.id],
     round: state.round,
-    timestamp: Date.now(),
+    timestamp: isoTimestamp(),
     cost,
     // How long the upgrade sat unlocked/affordable before this purchase -
     // null if that moment wasn't captured (e.g. it was already unlocked
     // when a resumed run started).
-    msSinceUnlocked: unlockedAt != null ? Math.round(now - unlockedAt) : null,
-    msSinceAffordable: affordableAt != null ? Math.round(now - affordableAt) : null,
+    timeSinceUnlocked: unlockedAt != null ? formatHms(now - unlockedAt) : null,
+    timeSinceAffordable: affordableAt != null ? formatHms(now - affordableAt) : null,
   });
   // Recomputed fresh next frame against the NEXT level's (higher) cost.
   state.upgradeAffordableAt[def.id] = null;
@@ -1081,6 +1355,8 @@ function spawnActivePlate() {
 
 function startRound(roundNum) {
   state.round = roundNum;
+  stackPileLayerDirty = true;
+  invalidateUpgradeTextCache();
   const total = platesForRound(roundNum);
   state.roundTotalPlates = total;
   state.roundStartTime = performance.now();
@@ -1088,6 +1364,7 @@ function startRound(roundNum) {
   state.roundCurrencyEarned = 0;
   state.stackRemaining = total - 1;
   state.stackOffsets = generateStackOffsets(state.stackRemaining);
+  stackPileLayerDirty = true;
   // Note: state.stacks is intentionally NOT reset here - stacks keep filling
   // up across rounds; see ensureStackSpace() for how the oldest one clears.
   state.animatingPlate = null;
@@ -1095,6 +1372,11 @@ function startRound(roundNum) {
   state.roundComplete = false;
   state.roundFinalElapsedMs = null;
   state.roundFinalBonusEarned = false;
+  // Note: this "hides" the panel via visibility:hidden, not display:none -
+  // see the #round-complete-panel.hidden override in style.css. That keeps
+  // the round-complete ad's <ins> at a constant, real size at all times, so
+  // it only ever needs to be pushed once (see window.__pushRoundCompleteAd
+  // in index.html) rather than rebuilt/re-pushed every round.
   roundCompletePanel.classList.add('hidden');
 }
 
@@ -1104,9 +1386,14 @@ function onRoundComplete() {
   state.activePlate = null;
 
   const elapsed = performance.now() - state.roundStartTime;
+  state.roundTimeTakenMs += elapsed;
   const timeLimitMs = state.roundTotalPlates * TIME_BONUS_SECONDS_PER_PLATE * 1000;
   const bonusEarned = elapsed < timeLimitMs;
-  const bonusPlateCount = bonusEarned ? Math.round(state.roundTotalPlates * TIME_BONUS_PAYOUT_FRACTION) : 0;
+  // Round 1 has one plate, so guarantee enough bonus currency (four plates)
+  // to buy the first sponge upgrade after its one-plate base reward.
+  const bonusPlateCount = bonusEarned
+    ? Math.max(state.round === 1 ? 4 : 0, Math.round(state.roundTotalPlates * TIME_BONUS_PAYOUT_FRACTION))
+    : 0;
   const bonusAmount = bonusPlateCount * NORMAL_REWARD * state.rewardMultiplier;
   if (bonusAmount > 0) {
     state.platesCleaned += bonusAmount;
@@ -1125,11 +1412,12 @@ function onRoundComplete() {
     playerId: state.playerId,
     runId: state.runId,
     round: state.round,
-    timestamp: Date.now(),
+    timestamp: isoTimestamp(),
     platesCleanedThisRound: state.roundPlatesWashed,
     currencyEarnedThisRound: state.roundCurrencyEarned,
+    elapsed: formatHms(elapsed),
     elapsedMs: Math.round(elapsed),
-    timeLimitMs: Math.round(timeLimitMs),
+    timeLimit: formatHms(timeLimitMs),
     bonusEarned,
     bonusAmount,
     platesCleanedLifetime: state.totalPlatesWashed,
@@ -1158,7 +1446,16 @@ function onRoundComplete() {
   roundCompleteBonus.textContent = bonusEarned
     ? `⏱ Finished in ${formatDuration(elapsed)} - Speed bonus: +${bonusAmount} plates! (target: ${formatMinSec(timeLimitMs)})`
     : `⏱ Finished in ${formatDuration(elapsed)} - too slow for the speed bonus (target: ${formatMinSec(timeLimitMs)})`;
+  finishRunBtn.classList.toggle('hidden', state.round < 5);
   roundCompletePanel.classList.remove('hidden');
+  // window.__pushRoundCompleteAd() (see index.html's ADSENSE block) only
+  // actually does anything the very first time this fires - it pushes the
+  // round-complete ad once and never again, since #round-complete-panel.hidden
+  // now uses visibility:hidden (see style.css) rather than display:none, so
+  // the ad's <ins> never needs re-requesting. window.__pushRoundCompleteAd
+  // not existing at all on a Steam/Play build (ad code stripped there) is
+  // why this is guarded rather than called directly.
+  if (window.__pushRoundCompleteAd) window.__pushRoundCompleteAd();
 }
 
 // Shows the shared end screen (same dynamic logo + copyright as the splash
@@ -1169,13 +1466,14 @@ function showGameOverScreen(reason) {
   state.roundComplete = true;
   state.activePlate = null;
   state.animatingPlate = null;
+  // See startRound()'s comment - visibility:hidden, not display:none.
   roundCompletePanel.classList.add('hidden');
 
   logEvent({
     type: 'run_end',
     playerId: state.playerId,
     runId: state.runId,
-    timestamp: Date.now(),
+    timestamp: isoTimestamp(),
     reason,
     round: state.round,
     totalPlatesWashed: state.totalPlatesWashed,
@@ -1204,11 +1502,29 @@ function showGameOverScreen(reason) {
     <ul class="game-over-upgrades-list">${purchasedLines || '<li>None</li>'}</ul>
   `;
   gameOverScreen.classList.remove('hidden');
+
+  // Best-effort calls to the Pi server - see the BACKEND SYNC section above.
+  // None of these can throw or block the screen above from showing; a
+  // missing/unreachable server just means no highscore list appears and
+  // nothing gets archived server-side this time.
+  submitScore(reason);
+  // Archive this run's events on the server, then wipe the local log - but
+  // only once that archive is confirmed (syncEventsToServer() resolves
+  // true). If the server's unreachable right now, leave the log alone so
+  // these events are retried at the next restart or game-over instead of
+  // being lost - see syncEventsToServer()'s comment.
+  syncEventsToServer().then((synced) => { if (synced) clearEvents(); });
+  fetchHighscores();
 }
 
 nextRoundBtn.addEventListener('click', () => {
   playDangDa();
   startRound(state.round + 1);
+});
+
+finishRunBtn.addEventListener('click', () => {
+  if (state.gameOver || !state.roundComplete || state.round < 5) return;
+  showGameOverScreen('You chose to finish after round ' + state.round + '.');
 });
 
 // Kicks off the fly-to-stack animation for a just-cleaned plate. The plate
@@ -1257,6 +1573,7 @@ function updatePlateAnimation() {
     state.roundCurrencyEarned += reward;
     state.washTimestamps.push(performance.now());
     state.stacks[anim.targetStackIndex].push(anim.plate.isGolden);
+    stacksLayerDirty = true;
 
     // One of the two win conditions (the other is finishing MAX_ROUNDS,
     // checked in onRoundComplete()) is maxing out every upgrade. Checked
@@ -1271,6 +1588,7 @@ function updatePlateAnimation() {
     if (state.stackRemaining > 0) {
       state.stackRemaining -= 1;
       state.stackOffsets.shift();
+      stackPileLayerDirty = true;
       state.activePlate = spawnActivePlate();
     } else {
       onRoundComplete();
@@ -1422,37 +1740,53 @@ function drawBubbles() {
 // Rendering
 // ----------------------------------------------------------------------------
 function drawBackground() {
-  ctx.fillStyle = '#6e5947';
-  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-  // subtle counter wood grain lines
-  ctx.strokeStyle = 'rgba(0,0,0,0.06)';
-  ctx.lineWidth = 1;
-  for (let y = HUD_HEIGHT; y < CANVAS_H; y += 14) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(CANVAS_W, y);
-    ctx.stroke();
+  if (!backgroundLayerCanvas) {
+    backgroundLayerCanvas = document.createElement('canvas');
+    backgroundLayerCanvas.width = CANVAS_W;
+    backgroundLayerCanvas.height = CANVAS_H;
+    const backgroundCtx = backgroundLayerCanvas.getContext('2d');
+    backgroundCtx.fillStyle = '#6e5947';
+    backgroundCtx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+    // This counter and its wood grain never change, so paint them once.
+    backgroundCtx.strokeStyle = 'rgba(0,0,0,0.06)';
+    backgroundCtx.lineWidth = 1;
+    for (let y = HUD_HEIGHT; y < CANVAS_H; y += 14) {
+      backgroundCtx.beginPath();
+      backgroundCtx.moveTo(0, y);
+      backgroundCtx.lineTo(CANVAS_W, y);
+      backgroundCtx.stroke();
+    }
   }
+  ctx.drawImage(backgroundLayerCanvas, 0, 0);
 }
 
 // Dirty plates waiting underneath the active one. Every plate in the pile
 // is rendered (see STACK_MAX_OFFSET for why the pile never runs off the
 // active plate's circle or off-screen even for huge piles).
 function drawStackPile() {
-  const layers = state.stackRemaining;
-  for (let depth = layers; depth >= 1; depth--) {
-    const off = state.stackOffsets[depth - 1];
-    if (!off) continue;
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(ACTIVE_X + off.x, ACTIVE_Y + off.y, PLATE_RADIUS, 0, Math.PI * 2);
-    ctx.fillStyle = '#d9d2c3';
-    ctx.fill();
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#b8ae98';
-    ctx.stroke();
-    ctx.restore();
+  if (state.stackRemaining <= 0) return;
+  if (!stackPileLayerCanvas || stackPileLayerDirty) {
+    const extent = Math.ceil((PLATE_RADIUS + STACK_MAX_OFFSET) * 2 + 4);
+    const center = extent / 2;
+    stackPileLayerCanvas = document.createElement('canvas');
+    stackPileLayerCanvas.width = extent;
+    stackPileLayerCanvas.height = extent;
+    const pileCtx = stackPileLayerCanvas.getContext('2d');
+    for (let depth = state.stackRemaining; depth >= 1; depth--) {
+      const off = state.stackOffsets[depth - 1];
+      if (!off) continue;
+      pileCtx.beginPath();
+      pileCtx.arc(center + off.x, center + off.y, PLATE_RADIUS, 0, Math.PI * 2);
+      pileCtx.fillStyle = '#d9d2c3';
+      pileCtx.fill();
+      pileCtx.lineWidth = 3;
+      pileCtx.strokeStyle = '#b8ae98';
+      pileCtx.stroke();
+    }
+    stackPileLayerDirty = false;
   }
+  const extent = stackPileLayerCanvas.width;
+  ctx.drawImage(stackPileLayerCanvas, ACTIVE_X - extent / 2, ACTIVE_Y - extent / 2);
 }
 
 // Progress bar shown just under the active plate, tracking its cleanliness.
@@ -1492,39 +1826,63 @@ function drawCleanlinessBar(percent) {
 // capped at STACK_SLOT_COUNT entries (see ensureStackSpace()), so every
 // stack currently in state.stacks is visible - nothing to skip here.
 function drawStacks() {
-  ctx.save();
-  ctx.fillStyle = 'rgba(0,0,0,0.2)';
-  ctx.fillRect(STACK_CONTAINER.x, STACK_CONTAINER.y, STACK_CONTAINER.w, STACK_CONTAINER.h);
-  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-  ctx.strokeRect(STACK_CONTAINER.x, STACK_CONTAINER.y, STACK_CONTAINER.w, STACK_CONTAINER.h);
-
-  ctx.fillStyle = '#e8f4ff';
-  ctx.font = 'bold 13px Segoe UI, Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('Stacks', STACK_CONTAINER.x + STACK_CONTAINER.w / 2, STACK_CONTAINER.y + 16);
-  ctx.textAlign = 'left';
-  ctx.restore();
-
-  // The array only ever holds up to STACK_SLOT_COUNT stacks (see
-  // ensureStackSpace()), so a stack's index is directly its visible slot.
-  state.stacks.forEach((stack, stackIndex) => {
-    stack.forEach((isGolden, i) => {
-      const pos = stackPlatePosition(stackIndex, i);
-      ctx.beginPath();
-      ctx.ellipse(pos.x, pos.y, 17, 10, 0, 0, Math.PI * 2);
-      ctx.fillStyle = isGolden ? '#ffd54f' : '#ffffff';
-      ctx.fill();
-      ctx.strokeStyle = isGolden ? '#b8860b' : '#cfd8dc';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
+  const borderPadding = 1;
+  if (!stacksLayerCanvas || stacksLayerDirty) {
+    stacksLayerCanvas = document.createElement('canvas');
+    stacksLayerCanvas.width = STACK_CONTAINER.w + borderPadding * 2;
+    stacksLayerCanvas.height = STACK_CONTAINER.h + borderPadding * 2;
+    const stacksCtx = stacksLayerCanvas.getContext('2d');
+    stacksCtx.fillStyle = 'rgba(0,0,0,0.2)';
+    stacksCtx.fillRect(borderPadding, borderPadding, STACK_CONTAINER.w, STACK_CONTAINER.h);
+    stacksCtx.strokeStyle = 'rgba(255,255,255,0.15)';
+    stacksCtx.strokeRect(borderPadding, borderPadding, STACK_CONTAINER.w, STACK_CONTAINER.h);
+    stacksCtx.fillStyle = '#e8f4ff';
+    stacksCtx.font = 'bold 13px Segoe UI, Arial, sans-serif';
+    stacksCtx.textAlign = 'center';
+    stacksCtx.fillText('Stacks', STACK_CONTAINER.w / 2 + borderPadding, 16 + borderPadding);
+    state.stacks.forEach((stack, stackIndex) => {
+      stack.forEach((isGolden, i) => {
+        const pos = stackPlatePosition(stackIndex, i);
+        const x = pos.x - STACK_CONTAINER.x + borderPadding;
+        const y = pos.y - STACK_CONTAINER.y + borderPadding;
+        stacksCtx.beginPath();
+        stacksCtx.ellipse(x, y, 17, 10, 0, 0, Math.PI * 2);
+        stacksCtx.fillStyle = isGolden ? '#ffd54f' : '#ffffff';
+        stacksCtx.fill();
+        stacksCtx.strokeStyle = isGolden ? '#b8860b' : '#cfd8dc';
+        stacksCtx.lineWidth = 1.5;
+        stacksCtx.stroke();
+      });
     });
-  });
+    stacksLayerDirty = false;
+  }
+  ctx.drawImage(stacksLayerCanvas, STACK_CONTAINER.x - borderPadding, STACK_CONTAINER.y - borderPadding);
 }
 
 // Upgrades box on the left, mirroring drawStacks()'s container on the
 // right. Each card shows name / level / current value plus a "Buy" button;
 // buttons are clicked (see the canvas 'click' listener above) to purchase -
 // see drawUpgradeButton().
+function getUpgradeTextLayout(def, index, item) {
+  const level = state.upgrades[def.id] || 0;
+  const width = item.w - 16;
+  const cached = upgradeTextCache[index];
+  if (cached && cached.level === level && cached.round === state.round && cached.width === width) return cached;
+
+  const maxLevelLabel = def.maxLevel != null ? def.maxLevel : '∞';
+  const levelText = `Lv. ${level} / ${maxLevelLabel}`;
+  const currentText = `Current: ${def.currentValueLabel()}`;
+  fittedFontSize(def.name, width, 14, 9, true);
+  const nameFont = ctx.font;
+  fittedFontSize(levelText, width, 12, 8, false);
+  const levelFont = ctx.font;
+  fittedFontSize(currentText, width, 12, 8, false);
+  const currentFont = ctx.font;
+  const layout = { level, round: state.round, width, nameText: def.name, nameFont, levelText, levelFont, currentText, currentFont, buttonFonts: Object.create(null) };
+  upgradeTextCache[index] = layout;
+  return layout;
+}
+
 function drawUpgradesPanel() {
   ctx.save();
   ctx.fillStyle = 'rgba(0,0,0,0.2)';
@@ -1550,6 +1908,7 @@ function drawUpgradesPanel() {
     const item = upgradeItemRect(index);
     const unlocked = isUpgradeUnlocked(index);
     const level = state.upgrades[def.id] || 0;
+    const textLayout = getUpgradeTextLayout(def, index, item);
     const cost = upgradeCost(def);
     const maxed = def.isMaxed ? def.isMaxed() : false;
     const affordable = unlocked && !maxed && state.platesCleaned >= cost;
@@ -1568,24 +1927,17 @@ function drawUpgradesPanel() {
     ctx.stroke();
 
     const textX = item.x + 8;
-    const textMaxWidth = item.w - 16;
-
     ctx.globalAlpha = unlocked ? 1 : 0.5;
     ctx.textAlign = 'left';
-
-    fittedFontSize(def.name, textMaxWidth, 14, 9, true);
+    ctx.font = textLayout.nameFont;
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(def.name, textX, item.y + 17);
-
-    const levelText = `Lv. ${level} / ${maxLevelLabel}`;
-    fittedFontSize(levelText, textMaxWidth, 12, 8, false);
+    ctx.fillText(textLayout.nameText, textX, item.y + 17);
+    ctx.font = textLayout.levelFont;
     ctx.fillStyle = '#9fd8b8';
-    ctx.fillText(levelText, textX, item.y + 35);
-
-    const currentText = `Current: ${def.currentValueLabel()}`;
-    fittedFontSize(currentText, textMaxWidth, 12, 8, false);
+    ctx.fillText(textLayout.levelText, textX, item.y + 35);
+    ctx.font = textLayout.currentFont;
     ctx.fillStyle = '#cfe0d8';
-    ctx.fillText(currentText, textX, item.y + 53);
+    ctx.fillText(textLayout.currentText, textX, item.y + 53);
     ctx.globalAlpha = 1;
     ctx.restore();
 
@@ -1594,12 +1946,16 @@ function drawUpgradesPanel() {
     if (!unlocked) {
       label = 'Locked'; kind = 'locked';
     } else if (maxed) {
-      label = 'FULL'; kind = 'full';
+      label = 'All Washed Up'; kind = 'full';
     } else {
       // Previews the value one more purchase would give (level + 1), so
       // the player sees what they're actually about to buy, not just the
-      // current level's value repeated.
-      label = `Buy ${def.currentValueLabel(level + 1)} for ${cost} plates`;
+      // current level's value repeated. The `true` here is forButtonLabel -
+      // only doublePlates' currentValueLabel() branches on it (short "X
+      // more" instead of the longer "Current:" phrasing, to fit the
+      // button); every other upgrade's currentValueLabel ignores the extra
+      // argument entirely and behaves exactly as before.
+      label = `Buy ${def.currentValueLabel(level + 1, true)} for ${cost} plates`;
       kind = affordable ? 'buy' : 'unaffordable';
     }
     drawUpgradeButton(def, index, btn, label, kind, hovered);
@@ -1666,7 +2022,14 @@ function drawUpgradeButton(def, index, rect, label, kind, hovered = false) {
   ctx.fillStyle = bg;
   roundRect(ctx, rect.x, rect.y, rect.w, rect.h, 5);
   ctx.fill();
-  fittedFontSize(label, rect.w - 10, 11, 7, true);
+  const textLayout = upgradeTextCache[index] || getUpgradeTextLayout(def, index, upgradeItemRect(index));
+  let buttonFont = textLayout.buttonFonts[label];
+  if (!buttonFont) {
+    fittedFontSize(label, rect.w - 10, 11, 7, true);
+    buttonFont = ctx.font;
+    textLayout.buttonFonts[label] = buttonFont;
+  }
+  ctx.font = buttonFont;
   ctx.fillStyle = fg;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -1960,14 +2323,26 @@ startWashingBtn.addEventListener('click', () => {
       type: 'run_end',
       playerId: state.playerId,
       runId: existing.runId,
-      timestamp: Date.now(),
+      timestamp: isoTimestamp(),
       reason: 'abandoned_new_game',
       round: existing.round,
     });
     clearSnapshot();
   }
+  // Starting a new game abandons whatever run was in progress (if any), so
+  // this is the one chance to get that partial run's telemetry onto the
+  // server before its local trace is cleared - previously this only
+  // happened on a full game-over, so an abandoned/partial run's events
+  // never made it to the server at all. Only wipe the local log once the
+  // server has confirmed receiving it; if it's unreachable right now, the
+  // log is left alone and retried at the next restart or game-over - same
+  // pattern as showGameOverScreen().
+  syncEventsToServer().then((synced) => { if (synced) clearEvents(); });
+
   state.runId = createId();
-  logEvent({ type: 'run_start', playerId: state.playerId, runId: state.runId, timestamp: Date.now() });
+  state.runStartedAt = Date.now();
+  state.roundTimeTakenMs = 0;
+  logEvent({ type: 'run_start', playerId: state.playerId, runId: state.runId, timestamp: isoTimestamp() });
   state.gameStarted = true;
   revealGameArea(() => {
     startRound(1);
@@ -1975,19 +2350,78 @@ startWashingBtn.addEventListener('click', () => {
   });
 });
 
+// ============================================================================
+// CHEAT MODE (?cheat=never&<field>=<value>...): an intentionally
+// undocumented escape hatch - nothing in the UI mentions it. A player who
+// inspects their own save (localStorage's dullasDishwater.save.v1 blob) can
+// see the exact field names a snapshot is built from - round, platesCleaned,
+// totalPlatesWashed, goldenPlatesWashed, totalPlatesSpent, upgrades,
+// spongeRadius, scrubEfficiency, rewardMultiplier, stacks - and pass any of
+// those as a same-named, EXACT-CASE-MATCHED query parameter alongside
+// cheat=never to build a fabricated "continue" snapshot with those values
+// baked in. Simply visiting the URL with these params does nothing on its
+// own - the fabricated snapshot only takes effect once the player actually
+// presses the resulting "Continue - Round X WITH CHEATING" button.
+// ============================================================================
+function buildCheatSnapshotFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('cheat') !== 'never') return null;
+
+  // Starts from the player's real save (if any) so unspecified fields keep
+  // their genuine progress, or a fresh round-1 baseline otherwise.
+  const base = loadSnapshot() || {
+    version: 1,
+    playerId: state.playerId,
+    runId: null,
+    runStartedAt: null,
+    round: 1,
+    platesCleaned: 0,
+    totalPlatesWashed: 0,
+    goldenPlatesWashed: 0,
+    totalPlatesSpent: 0,
+    upgrades: {},
+    spongeRadius: LARGER_SPONGE_START_RADIUS,
+    scrubEfficiency: 1,
+    rewardMultiplier: 1,
+    stacks: [[]],
+  };
+  const cheatSnapshot = { ...base };
+
+  params.forEach((rawValue, key) => {
+    if (key === 'cheat') return;
+    // Only known snapshot fields, and only an exact case-sensitive name
+    // match - there's no partial matching or documented list to guess from.
+    if (!Object.prototype.hasOwnProperty.call(base, key)) return;
+    const current = base[key];
+    if (typeof current === 'number') {
+      const n = Number(rawValue);
+      if (!Number.isNaN(n)) cheatSnapshot[key] = n;
+    } else if (typeof current === 'object' && current !== null) {
+      try { cheatSnapshot[key] = JSON.parse(rawValue); } catch (e) { /* malformed override ignored */ }
+    } else {
+      cheatSnapshot[key] = rawValue;
+    }
+  });
+
+  return cheatSnapshot;
+}
+
+const cheatSnapshot = buildCheatSnapshotFromUrl();
+
 continueBtn.addEventListener('click', () => {
   if (state.gameStarted) return;
   ensureAudioContext();
   whenAudioRunning(playLetsGo);
-  const snapshot = loadSnapshot();
+  const snapshot = cheatSnapshot || loadSnapshot();
   if (!snapshot) return;
   applySnapshotToState(snapshot);
   logEvent({
     type: 'run_resumed',
     playerId: state.playerId,
     runId: state.runId,
-    timestamp: Date.now(),
+    timestamp: isoTimestamp(),
     round: state.round,
+    cheated: !!cheatSnapshot,
   });
   state.gameStarted = true;
   // Restarts the round the player was on with a fresh dirty plate/pile -
@@ -1995,14 +2429,21 @@ continueBtn.addEventListener('click', () => {
   // be restored, and startRound() for why this leaves state.stacks alone.
   revealGameArea(() => {
     startRound(state.round);
+    if (cheatSnapshot) saveSnapshot(); // persist the cheated state too, so a refresh doesn't lose it
   });
 });
 
-// Offer "Continue" only if a resumable save actually exists.
+// Offer "Continue" if a resumable save exists, or - taking priority - if a
+// cheat snapshot was built from the URL (see CHEAT MODE above).
 const savedGame = loadSnapshot();
-if (savedGame) {
+if (cheatSnapshot) {
+  continueBtn.textContent = `Continue - Round ${cheatSnapshot.round} WITH CHEATING`;
+  continueBtn.classList.remove('hidden');
+} else if (savedGame) {
   continueBtn.textContent = `Continue - Round ${savedGame.round}`;
   continueBtn.classList.remove('hidden');
 }
+
+initPlayerNameUI();
 
 requestAnimationFrame(tick);
