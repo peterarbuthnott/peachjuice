@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Britain in six strands, 1500 onwards</title>
+<style>
+:root{--bg:#f2f4f7;--fg:#14202e;--muted:#566474;--card:#fff;--line:#c9d1db;--bar:#fff;
+--c-m:#7c4dbd;--c-i:#c8481f;--c-t:#0b7a8a;--c-r:#2457c5;--c-a:#3b8736;--c-x:#b8317a;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1722;--fg:#e8edf3;--muted:#9aa8b8;--card:#172231;--line:#2c3b4e;--bar:#0f1722;
+--c-m:#b79bf0;--c-i:#ff8f66;--c-t:#54c6d6;--c-r:#7aa2ff;--c-a:#8fd68a;--c-x:#f08cc0;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1722;--fg:#e8edf3;--muted:#9aa8b8;--card:#172231;--line:#2c3b4e;--bar:#0f1722;
+--c-m:#b79bf0;--c-i:#ff8f66;--c-t:#54c6d6;--c-r:#7aa2ff;--c-a:#8fd68a;--c-x:#f08cc0;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 "Segoe UI",Calibri,Helvetica,Arial,sans-serif;display:flex;flex-direction:column}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bar);z-index:20}
+header{padding:12px 16px 10px;background:var(--bar)}
+h1{font:700 clamp(20px,3.4vw,28px)/1.1 Georgia,"Times New Roman",serif;margin:0 0 8px}
+#chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:6px 11px 6px 8px;border-radius:999px;border:1.5px solid var(--line);background:var(--card);color:var(--muted);font:600 13.5px/1 inherit;cursor:pointer}
+.chip i{width:22px;height:14px;border-radius:7px;background:var(--line);position:relative}
+.chip i::after{content:"";position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:50%;background:var(--card);transition:transform .15s}
+.chip[aria-checked="true"]{border-color:var(--c);color:var(--fg)}
+.chip[aria-checked="true"] i{background:var(--c)}
+.chip[aria-checked="true"] i::after{transform:translateX(8px)}
+.row2{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin-top:9px;font-size:13.5px;color:var(--muted)}
+.row2 button{background:none;border:0;color:var(--fg);text-decoration:underline;text-underline-offset:3px;cursor:pointer;font:inherit;padding:2px 0}
+.row2 label{display:flex;align-items:center;gap:6px;margin-left:auto}
+.info{margin-top:8px;min-height:62px;padding:8px 12px;background:var(--card);border:1px solid var(--line);border-radius:8px}
+#read{font:700 16px/1.3 Georgia,serif}
+#det{font-size:14px;color:var(--muted);margin-top:2px}
+button:focus-visible,input:focus-visible{outline:3px solid var(--c-r);outline-offset:2px}
+.scroll{flex:1;min-height:0;overflow:auto;border-top:1px solid var(--line);position:relative;overscroll-behavior:contain}
+.grid{position:relative;width:max-content}
+.head{position:sticky;top:0;z-index:6;background:var(--bar);border-bottom:1px solid var(--line)}
+.hr,.lane{display:flex}
+.lab{position:sticky;left:0;z-index:4;width:var(--L);flex:0 0 var(--L);background:var(--bar);border-right:1px solid var(--line);padding:8px;font:700 13px/1.2 Georgia,serif;color:var(--c,var(--muted))}
+.track{position:relative;flex:0 0 auto}
+.axis{height:26px}.rib{height:24px;border-top:1px solid var(--line)}
+.axis .lab,.rib .lab{padding:5px 8px;font:600 12px/1.4 "Segoe UI",sans-serif;color:var(--muted)}
+.tk{position:absolute;top:0;bottom:0;border-left:1px solid var(--line);padding:4px 0 0 4px;font-size:12px;color:var(--muted)}
+.tk.c{border-left:2px solid var(--fg);color:var(--fg);font-weight:700}
+.rb{position:absolute;top:0;bottom:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;line-height:23px;padding:0 5px;border-left:1px solid var(--c-m);color:var(--fg)}
+.rb.o{background:color-mix(in srgb,var(--c-m) 16%,transparent)}
+.over{position:absolute;left:var(--L);top:var(--H);bottom:0;width:var(--W);pointer-events:none;z-index:0}
+.band{position:absolute;top:0;bottom:0}.band.o{background:color-mix(in srgb,var(--c-m) 9%,transparent)}
+.gl{position:absolute;top:0;bottom:0;border-left:1px dashed color-mix(in srgb,var(--line) 60%,transparent)}
+.cross{position:absolute;top:0;bottom:0;width:2px;background:var(--fg);opacity:.45;display:none;z-index:3}
+.lane{position:relative;z-index:1;border-bottom:1px solid var(--line)}
+.pin,.reign{position:absolute;font:inherit;color:var(--fg);cursor:pointer;text-align:left}
+.pin{display:flex;align-items:center;gap:5px;height:24px;background:var(--card);border:1px solid color-mix(in srgb,var(--c) 55%,var(--line));border-radius:12px;padding:0 9px 0 6px;white-space:nowrap;font-size:12.5px}
+.pin::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--c);flex:none}
+.pin b{font-weight:700}
+.reign{top:6px;height:38px;overflow:hidden;white-space:nowrap;border:1px solid var(--c-m);border-radius:6px;padding:2px 8px;background:color-mix(in srgb,var(--c-m) 20%,var(--card));font:700 13px/1.25 Georgia,serif}
+.reign small{display:block;font:400 11.5px/1.2 "Segoe UI",sans-serif;color:var(--muted)}
+.pin:hover,.pin:focus-visible,.pin.sel,.reign:hover,.reign.sel{z-index:2;border-width:2px;background:color-mix(in srgb,var(--c) 14%,var(--card))}
+.reign:hover,.reign.sel{background:color-mix(in srgb,var(--c-m) 34%,var(--card))}
+#empty{display:none;position:sticky;left:0;padding:24px 16px;color:var(--muted)}
+@media (max-width:560px){.info{min-height:74px}}
+</style>
+</head>
+<body>
+<header>
+<h1>Britain in six strands, 1500 onwards</h1>
+<div id="chips" role="group" aria-label="Timeline strands"></div>
+<div class="row2"><button id="all">Show all</button><button id="none">Hide all</button><span>Jump to</span><span id="jump"></span><label>Zoom <input id="z" type="range" min="5" max="16" value="10" aria-label="Zoom"></label></div>
+<div class="info" aria-live="polite"><div id="read">Move across the chart, or tap an event</div><div id="det">Every row shares one time scale, so read straight down to see what else was happening, and who was on the throne.</div></div>
+</header>
+<div class="scroll" id="sc"><div class="grid" id="grid"></div><p id="empty">No strands selected. Switch one on above.</p></div>
+<script>
+const S={m:"Monarchs",i:"Industry",t:"Trade",r:"Transport",a:"Agriculture",x:"Textiles"};
+const D=[
+[1509,"m","Henry VIII","Accedes aged 17; breaks with Rome and begins the English Reformation (1534)."],
+[1547,"m","Edward VI","Boy-king; Protestant reform deepens under his regents."],
+[1553,"m","Mary I","Succeeds after Lady Jane Grey’s nine-day claim; restores Catholicism."],
+[1558,"m","Elizabeth I","Reigns 44 years; Protestant settlement and the Armada victory (1588)."],
+[1603,"m","James I","James VI of Scotland inherits the English crown: the Union of the Crowns."],
+[1625,"m","Charles I","Conflict with Parliament leads to civil war (1642) and his execution (1649)."],
+[1649,"m","Commonwealth and Protectorate","The monarchy is abolished; from 1653 Oliver Cromwell is Lord Protector."],
+[1660,"m","Charles II","Monarchy restored; the Royal Society receives its charter in 1662."],
+[1685,"m","James II","The Catholic king is deposed in the Glorious Revolution (1688)."],
+[1689,"m","William III and Mary II","The Bill of Rights confirms parliamentary supremacy."],
+[1702,"m","Anne","The last Stuart monarch."],
+[1707,"m","Acts of Union","England and Scotland merge as the Kingdom of Great Britain.","e"],
+[1714,"m","George I","First Hanoverian king."],
+[1727,"m","George II","Reigns through the Jacobite rising of 1745."],
+[1760,"m","George III","A 60-year reign; loses the American colonies (1783)."],
+[1801,"m","Union with Ireland","The United Kingdom of Great Britain and Ireland is created.","e"],
+[1820,"m","George IV","Succeeds after a long Regency."],
+[1830,"m","William IV","Reform Act (1832) widens the vote."],
+[1837,"m","Victoria","A 63-year reign at the height of industry and empire."],
+[1901,"m","Edward VII","Succeeds Victoria."],
+[1910,"m","George V","Reigns through the First World War."],
+[1936,"m","Edward VIII","Abdicates within the year."],
+[1936,"m","George VI","Reigns through the Second World War."],
+[1952,"m","Elizabeth II","The longest reign in British history, to 2022."],
+[2022,"m","Charles III","Accedes on the death of Elizabeth II."],
+[1543,"i","Cast-iron cannon","Ralph Hogge casts iron guns in the Sussex Weald, where charcoal-fired blast furnaces multiply."],
+[1620,"i","Dud Dudley’s coal-smelted iron","He claims in the 1620s to smelt iron with coal, but never makes it commercial."],
+[1698,"i","Savery’s steam pump","Thomas Savery patents a steam-driven pump, the “Miner’s Friend”."],
+[1709,"i","Coke smelting at Coalbrookdale","Abraham Darby smelts iron ore with coke, freeing iron from scarce charcoal."],
+[1712,"i","Newcomen’s atmospheric engine","The first practical steam engine pumps water from a Staffordshire mine."],
+[1742,"i","Crucible steel","Benjamin Huntsman perfects high-quality cast steel in Sheffield."],
+[1769,"i","Watt’s separate condenser","James Watt’s patent makes the steam engine far more efficient."],
+[1775,"i","Wilkinson’s boring machine","Accurate cylinder boring makes Watt’s engines practical."],
+[1779,"i","The Iron Bridge","Abraham Darby III completes the world’s first major cast-iron bridge."],
+[1784,"i","Cort’s puddling process","Henry Cort’s puddling and rolling produces wrought iron in bulk."],
+[1815,"i","Davy safety lamp","Humphry Davy’s lamp reduces firedamp explosions in coal mines."],
+[1828,"i","Hot blast","James Neilson’s preheated air saves fuel in iron furnaces."],
+[1839,"i","Steam hammer","James Nasmyth’s design allows very large forgings."],
+[1856,"i","Bessemer converter","Henry Bessemer’s process makes cheap steel in quantity."],
+[1879,"i","Swan’s electric lamp","Joseph Swan demonstrates a practical incandescent bulb in Newcastle."],
+[1884,"i","Parsons’ steam turbine","Charles Parsons’ turbine later drives ships and power stations."],
+[1562,"t","Hawkins’s slaving voyage","John Hawkins makes the first English voyage carrying enslaved Africans across the Atlantic."],
+[1600,"t","East India Company chartered","Elizabeth I grants a monopoly on English trade with the East Indies."],
+[1627,"t","Barbados settled","The English colony becomes a sugar economy built on enslaved labour from the 1640s."],
+[1651,"t","Navigation Acts","Goods must be carried in English ships, shaping the colonial trade."],
+[1655,"t","Jamaica captured","England seizes the island from Spain; it becomes a major sugar colony."],
+[1658,"t","Tea advertised in London","A coffee house advertises “that excellent China drink” for sale."],
+[1662,"t","Catherine of Braganza","The new queen’s tea-drinking helps fashion the drink at court."],
+[1672,"t","Royal African Company","Chartered with a monopoly on English trade in Africa, including enslaved people."],
+[1698,"t","Slave trade opened to private traders","Bristol and Liverpool merchants flourish as the monopoly ends."],
+[1713,"t","The asiento","The Treaty of Utrecht gives Britain the contract to supply enslaved Africans to Spanish America."],
+[1772,"t","The Somerset case","Lord Mansfield’s ruling bars the forcible removal of an enslaved man from England."],
+[1773,"t","Tea Act and Boston Tea Party","Colonists destroy East India Company tea in protest at taxation."],
+[1784,"t","Commutation Act","Tea duty falls from 119% to 12.5%, undercutting smugglers and boosting legal imports."],
+[1787,"t","Abolition Committee formed","Campaigners including Thomas Clarkson and Granville Sharp organise the movement."],
+[1807,"t","Slave Trade Act","Parliament abolishes the British slave trade."],
+[1833,"t","Slavery Abolition Act","Slavery ends across most of the Empire from 1834; enslavers, not the enslaved, are compensated."],
+[1839,"t","Assam Company","The first British-run tea company grows tea in India."],
+[1848,"t","Robert Fortune in China","He obtains tea plants and expertise for the East India Company’s Indian plantations."],
+[1869,"t","Cutty Sark launched","A tea clipper built for speed, soon undercut by the Suez Canal and steamships."],
+[1555,"r","Highways Act","Each parish must maintain its roads using unpaid labour."],
+[1663,"r","First turnpike","Tolls on the Great North Road begin to fund repairs."],
+[1761,"r","Bridgewater Canal","Worsley to Manchester: the first major canal of the industrial age."],
+[1766,"r","Trent and Mersey Canal begun","The Grand Trunk, finished in 1777, links major river systems."],
+[1784,"r","Mail coaches","John Palmer’s fast coaches run from Bristol and Bath to London."],
+[1793,"r","Canal Mania","A boom of canal-building acts runs through the 1790s."],
+[1804,"r","Trevithick’s locomotive","Richard Trevithick hauls ten tons of iron on rails at Penydarren."],
+[1816,"r","McAdam’s roads","John McAdam’s method of crushed-stone surfacing spreads, as does Telford’s."],
+[1825,"r","Stockton and Darlington Railway","The first public railway to use steam locomotives."],
+[1830,"r","Liverpool and Manchester Railway","Opens after the Rainhill trials; the first intercity passenger line."],
+[1841,"r","Great Western Railway","Brunel’s line connects London and Bristol."],
+[1844,"r","Railway Regulation Act","Requires cheap daily “Parliamentary trains”, and Railway Mania peaks in 1845–47."],
+[1863,"r","London Underground","The Metropolitan Railway opens, the first underground passenger line."],
+[1888,"r","Dunlop’s pneumatic tyre","John Dunlop’s invention transforms cycling."],
+[1894,"r","Manchester Ship Canal","Ocean-going ships can reach inland Manchester."],
+[1896,"r","Locomotives on Highways Act","Raises the speed limit to 14 mph and abolishes the red-flag rule."],
+[1523,"a","Fitzherbert’s Boke of Husbandrye","The first English printed guide to farming."],
+[1597,"a","Potato in English gardens","Gerard’s Herball illustrates the potato, which spreads slowly as a crop."],
+[1645,"a","Clover and turnips","Sir Richard Weston champions both as fodder crops after seeing them in Flanders."],
+[1701,"a","Tull’s seed drill","Jethro Tull’s horse-drawn drill sows seed in rows."],
+[1730,"a","Norfolk four-course rotation","Wheat, turnips, barley and clover: Viscount Townshend popularises the system around now."],
+[1760,"a","Parliamentary enclosure","Enclosure acts multiply, reshaping village farming and common land."],
+[1767,"a","Bakewell’s selective breeding","Robert Bakewell’s improved Leicester sheep and cattle transform livestock."],
+[1793,"a","Board of Agriculture","Founded to promote improved farming."],
+[1815,"a","Corn Laws","Tariffs protect landowners and keep bread prices high."],
+[1830,"a","Swing Riots","Farm labourers destroy threshing machines across southern England."],
+[1843,"a","Rothamsted Experimental Station","John Lawes, who patented superphosphate in 1842, begins long-term field trials."],
+[1846,"a","Corn Laws repealed","Free trade in grain follows the Irish famine."],
+[1850,"a","Steam ploughing","John Fowler’s steam ploughing engines appear in the 1850s."],
+[1880,"a","Refrigerated imports","Frozen meat and cheap American grain deepen the agricultural depression."],
+[1565,"x","New Draperies","Dutch and Walloon refugees in Norwich introduce lighter cloths."],
+[1589,"x","Lee’s stocking frame","William Lee’s knitting machine is refused a patent by Elizabeth I."],
+[1700,"x","Calico Act","Parliament bans printed Indian calicoes to protect wool, extended in 1721."],
+[1733,"x","Flying shuttle","John Kay’s shuttle doubles the speed of weaving."],
+[1764,"x","Spinning jenny","James Hargreaves’ machine spins several threads at once."],
+[1769,"x","Water frame","Richard Arkwright patents roller spinning powered by water."],
+[1771,"x","Cromford Mill","Arkwright opens the first water-powered cotton mill, a template for the factory."],
+[1779,"x","Crompton’s mule","Combines the jenny and water frame to spin fine, strong thread."],
+[1785,"x","Cartwright’s power loom","Edmund Cartwright patents a loom driven by water or steam."],
+[1793,"x","Whitney’s cotton gin","The American invention expands slave-grown cotton supplied to Lancashire."],
+[1811,"x","Luddite protests","Textile workers smash machines in the Midlands and the north until 1816."],
+[1825,"x","Roberts’ self-acting mule","Richard Roberts automates spinning."],
+[1833,"x","Factory Act","Limits children’s hours and creates factory inspectors."],
+[1856,"x","Perkin’s mauve","William Perkin discovers the first synthetic dye."],
+[1861,"x","Cotton Famine","The American Civil War cuts Lancashire’s cotton supply until 1865."]
+];
+const sorted=D.map((e,n)=>[e,n]).sort((a,b)=>a[0][0]-b[0][0]||a[1]-b[1]).map(x=>x[0]);
+const START=1500,END=2025,L=96,$=id=>document.getElementById(id);
+// reigns with start/end (Edward VIII and George VI share 1936)
+const reigns=[{n:"Henry VII",s:1500,y:"1485–1509"}];
+sorted.filter(e=>e[1]==="m"&&!e[4]).forEach(e=>{const dup=reigns.some(r=>Math.floor(r.s)===e[0]&&r.s>1500);reigns.push({n:e[2],s:e[0]+(dup?.9:0),d:e[3]})});
+reigns.forEach((r,i)=>{r.e=i<reigns.length-1?reigns[i+1].s:END;r.y=r.y||(Math.floor(r.s)+"–"+(i<reigns.length-1?Math.ceil(r.e-.5):""));});
+reigns.find(r=>r.n==="Edward VIII").y="1936";reigns.find(r=>r.n==="George VI").y="1936–1952";
+const reignAt=y=>{let r=reigns[0];for(const k of reigns){if(k.s<=y)r=k;else break}return r.n};
+const on=new Set(Object.keys(S));let ppy=10,info=[];
+const esc=s=>s;
+function build(){
+  const W=Math.round((END-START)*ppy)+220,X=y=>Math.round((y-START)*ppy);
+  const g=$("grid");info=[];
+  g.style.setProperty("--L",L+"px");g.style.setProperty("--W",W+"px");g.style.setProperty("--H","51px");
+  let h=`<div class="over">`;
+  reigns.forEach((r,i)=>{if(i%2)h+=`<div class="band o" style="left:${X(r.s)}px;width:${X(r.e)-X(r.s)}px"></div>`});
+  for(let y=START;y<=END;y+=25)h+=`<div class="gl" style="left:${X(y)}px"></div>`;
+  h+=`<div class="cross" id="cross"></div></div><div class="head"><div class="hr axis"><div class="lab">Year</div><div class="track" style="width:${W}px">`;
+  for(let y=START;y<=END;y+=25)h+=`<div class="tk${y%100?"":" c"}" style="left:${X(y)}px">${y}</div>`;
+  h+=`</div></div><div class="hr rib"><div class="lab">Reign</div><div class="track" style="width:${W}px">`;
+  reigns.forEach((r,i)=>{const w=X(r.e)-X(r.s);h+=`<div class="rb${i%2?" o":""}" style="left:${X(r.s)}px;width:${w}px" title="${r.n}">${w>34?r.n:""}</div>`});
+  h+=`</div></div></div>`;
+  for(const k of Object.keys(S)){
+    let body="",rows=0;
+    if(k==="m"){
+      reigns.forEach((r,i)=>{const w=Math.max(X(r.e)-X(r.s),4);const id=info.push({y:Math.floor(r.s),t:r.n,d:r.d||"Reigned before the chart begins; Henry VII was king until 1509.",k:"m",yr:r.y,r:r.n})-1;
+        body+=`<button class="reign" data-i="${id}" style="--c:var(--c-m);left:${X(r.s)}px;width:${w}px" title="${r.n}">${w>60?`${r.n}<small>${r.y}</small>`:""}</button>`});
+      const ex=sorted.filter(e=>e[1]==="m"&&e[4]);
+      ex.forEach(e=>{const id=info.push({y:e[0],t:e[2],d:e[3],k:"m",r:reignAt(e[0])})-1;body+=`<button class="pin" data-i="${id}" style="--c:var(--c-m);left:${X(e[0])-11}px;top:50px"><b>${e[0]}</b> ${e[2]}</button>`});
+      rows=1;var lh=88;
+    }else{
+      const ends=[];
+      sorted.filter(e=>e[1]===k).forEach(e=>{const x=X(e[0])-11,w=(String(e[0]).length+1+e[2].length)*6.5+34;
+        let r=ends.findIndex(v=>v+6<=x);if(r<0){r=ends.length;ends.push(0)}ends[r]=x+w;
+        const id=info.push({y:e[0],t:e[2],d:e[3],k,r:reignAt(e[0])})-1;
+        body+=`<button class="pin" data-i="${id}" style="--c:var(--c-${k});left:${x}px;top:${6+r*30}px"><b>${e[0]}</b> ${e[2]}</button>`});
+      var lh=ends.length*30+10;
+    }
+    h+=`<div class="lane" data-k="${k}" style="--c:var(--c-${k});height:${lh}px;display:${on.has(k)?"flex":"none"}"><div class="lab">${S[k]}</div><div class="track" style="width:${W}px">${body}</div></div>`;
+  }
+  g.innerHTML=h;
+}
+function chips(){
+  $("chips").innerHTML=Object.keys(S).map(k=>`<button class="chip" role="switch" data-k="${k}" style="--c:var(--c-${k})" aria-checked="${on.has(k)}"><i></i>${S[k]}</button>`).join("");
+  $("empty").style.display=on.size?"none":"block";
+}
+function toggle(f){f();chips();document.querySelectorAll(".lane").forEach(l=>l.style.display=on.has(l.dataset.k)?"flex":"none")}
+$("chips").onclick=e=>{const b=e.target.closest(".chip");if(b)toggle(()=>on.has(b.dataset.k)?on.delete(b.dataset.k):on.add(b.dataset.k))};
+$("all").onclick=()=>toggle(()=>Object.keys(S).forEach(k=>on.add(k)));
+$("none").onclick=()=>toggle(()=>on.clear());
+$("jump").innerHTML=[1500,1600,1700,1800,1900,2000].map(y=>`<button data-y="${y}">${y}</button>`).join(" ");
+$("jump").onclick=e=>{const y=e.target.dataset.y;if(y)$("sc").scrollTo({left:(y-START)*ppy,behavior:"smooth"})};
+$("z").oninput=e=>{const sc=$("sc"),mid=START+(sc.scrollLeft+sc.clientWidth/2-L)/ppy;ppy=+e.target.value;build();sc.scrollLeft=(mid-START)*ppy-sc.clientWidth/2+L};
+function show(el){
+  const o=info[el.dataset.i];if(!o)return;
+  document.querySelectorAll(".sel").forEach(x=>x.classList.remove("sel"));el.classList.add("sel");
+  $("read").textContent=o.k==="m"?`${o.t}${o.yr?" ("+o.yr+")":" ("+o.y+")"}`:`${o.y}: ${o.t}`;
+  $("det").textContent=o.d+(o.k==="m"?"":` Fell in the reign of ${o.r}.`);
+}
+const gr=$("grid");
+gr.addEventListener("mouseover",e=>{const b=e.target.closest(".pin,.reign");if(b)show(b)});
+gr.addEventListener("focusin",e=>{const b=e.target.closest(".pin,.reign");if(b)show(b)});
+gr.addEventListener("click",e=>{const b=e.target.closest(".pin,.reign");if(b)show(b)});
+gr.addEventListener("pointermove",e=>{
+  const x=e.clientX-gr.getBoundingClientRect().left-L,c=$("cross");
+  if(!c)return;if(x<0||e.target.closest(".pin,.reign")){return}
+  c.style.display="block";c.style.left=x+"px";
+});
+gr.addEventListener("pointerleave",()=>{const c=$("cross");if(c)c.style.display="none"});
+gr.addEventListener("pointermove",e=>{
+  if(e.target.closest(".pin,.reign"))return;
+  const x=e.clientX-gr.getBoundingClientRect().left-L;if(x<0)return;
+  const y=Math.round(START+x/ppy);if(y>END)return;
+  $("read").textContent=`${y}: reign of ${reignAt(y)}`;
+});
+chips();build();
+</script>
+</body>
+</html>
