@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://www.andisdad.net/home.html</loc></url>
+  <url><loc>https://www.andisdad.net/</loc></url>
   <url><loc>https://www.andisdad.net/about.html</loc></url>
-  <url><loc>https://www.andisdad.net/hints.html</loc></url>
-  <url><loc>https://www.andisdad.net/highscores-info.html</loc></url>
-  <url><loc>https://www.andisdad.net/ideas.html</loc></url>
-  <url><loc>https://www.andisdad.net/highscores.html</loc></url>
+  <url><loc>https://www.andisdad.net/dullas/</loc></url>
+  <url><loc>https://www.andisdad.net/dullas/about.html</loc></url>
+  <url><loc>https://www.andisdad.net/dullas/hints.html</loc></url>
+  <url><loc>https://www.andisdad.net/dullas/highscores-info.html</loc></url>
+  <url><loc>https://www.andisdad.net/dullas/ideas.html</loc></url>
+  <url><loc>https://www.andisdad.net/dullas/highscores.html</loc></url>
   <url><loc>https://www.andisdad.net/nominate/index.html</loc></url>
   <url><loc>https://www.andisdad.net/nominate/about.html</loc></url>
   <url><loc>https://www.andisdad.net/nominate/hints.html</loc></url>
@@ -23,4 +25,6 @@
   <url><loc>https://www.andisdad.net/drying/highscores-info.html</loc></url>
   <url><loc>https://www.andisdad.net/drying/ideas.html</loc></url>
   <url><loc>https://www.andisdad.net/drying/highscores.html</loc></url>
+  <url><loc>https://www.andisdad.net/history/</loc></url>
+  <url><loc>https://www.andisdad.net/history/about.html</loc></url>
 </urlset>

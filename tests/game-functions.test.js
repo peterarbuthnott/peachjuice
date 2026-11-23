@@ -93,7 +93,7 @@ test('the live static roots expose a sitemap and select built minified assets wh
   assert.match(dullasServer, /'\.xml':\s*'application\/xml; charset=utf-8'/);
   for (const game of ['dullas', 'nominate/public', 'standup/public', 'drying/public']) {
     for (const page of ['about.html', 'hints.html', 'highscores-info.html', 'ideas.html']) {
-      const url = game === 'dullas' ? `https://www.andisdad.net/${page}` : `https://www.andisdad.net/${game.split('/')[0]}/${page}`;
+      const url = `https://www.andisdad.net/${game.split('/')[0]}/${page}`;
       assert.ok(sitemap.includes(`<loc>${url}</loc>`), `${url} should be in the sitemap`);
     }
   }

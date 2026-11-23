@@ -3,7 +3,8 @@
   "private": true,
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "build": "npm test && node scripts/minify.js"
+    "build:assets": "node scripts/minify.js",
+    "build": "npm test && npm run build:assets"
   },
   "devDependencies": {
     "clean-css": "^5.3.3",

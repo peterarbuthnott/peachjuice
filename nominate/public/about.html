@@ -1,6 +1,38 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="About the game for Nominate — Whist Scoring."><title>About the game | Nominate — Whist Scoring</title>
-<style>body{margin:0;background:#f4f6f8;color:#1e2933;font:17px/1.65 system-ui,Arial,sans-serif}main{max-width:760px;margin:4rem auto;padding:0 1.25rem}h1{line-height:1.2}nav,footer{border-top:1px solid #ccd4dc;margin-top:2rem;padding-top:1rem}nav ul{display:flex;flex-wrap:wrap;gap:.5rem 1.5rem;padding-left:1.2rem}a{color:#075c91}.back{font-size:.95rem}</style>  <link rel="stylesheet" href="scene-switcher.css">
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="How this Nomination Whist game plays, how its rounds work and how scores are calculated.">
+<title>About Nominate | Nomination Whist scoring</title>
+<style>body{margin:0;background:#f4f6f8;color:#1e2933;font:17px/1.65 system-ui,Arial,sans-serif}main{max-width:760px;margin:4rem auto;padding:0 1.25rem}h1,h2{line-height:1.25}nav,footer{border-top:1px solid #ccd4dc;margin-top:2rem;padding-top:1rem}nav ul{display:flex;flex-wrap:wrap;gap:.5rem 1.5rem;padding-left:1.2rem}a{color:#075c91}.back{font-size:.95rem}</style>
+<link rel="stylesheet" href="scene-switcher.css">
+<link rel="canonical" href="https://www.andisdad.net/nominate/about.html">
 </head>
-<body><main><p class="back"><a href="index.html">← Back to Nominate — Whist Scoring</a></p><article><h1>About the game</h1><p>A companion for playing Nomination Whist with a group. Set up the players, follow the changing hand sequence, record bids and tricks, and keep cumulative scores together as the game progresses.</p></article><nav aria-label="Game information"><h2>Explore</h2><ul><li><a href="hints.html">Hints and tips</a></li><li><a href="highscores-info.html">How highscores work</a></li><li><a href="ideas.html">New ideas</a></li></ul></nav><footer><a href="/">Andisdad Games home</a></footer></main>  <script src="scene-switcher.js" defer></script>
-</body></html>
+<body><main>
+<p class="back"><a href="index.html">← Back to Nominate — Whist Scoring</a></p>
+<article>
+<h1>About Nominate</h1>
+<p>I'm Robin, and I built Nominate as a scorekeeper for a table playing Nomination Whist. Your group still deals and plays the cards; the app helps everyone follow the hand sequence, record each bid and trick, and see how the running totals change.</p>
+<p>There are several house-rule versions of Nomination Whist. This page describes the rules currently used by this app, so a group can check that they match the way they play before starting.</p>
+
+<h2>How a game is played</h2>
+<p>Set up the player names, then work through 18 rounds. In the regular rounds, players nominate how many tricks they expect to take. After the hand, the scorekeeper records the tricks won and the app adds the round’s points to each player’s total. The dealer moves to the next player as the game advances.</p>
+<p>The opening seven rounds grow from one trick to seven. Their trump suits are clubs, diamonds, hearts, spades, clubs, diamonds and hearts. Four “Miss” rounds follow. Each has seven tricks in play: round 8 is spades, round 9 is no-trump, round 10 is clubs and round 11 is no-trump. The last two Miss rounds are blind. The final seven regular rounds descend from seven tricks to one, with trumps in this order: diamonds, hearts, spades, clubs, diamonds, hearts and spades.</p>
+
+<h2>How the score is calculated</h2>
+<p>In a regular round, an exact bid earns <strong>10 points plus the number of tricks nominated</strong>. A player who bids 3 and takes 3 earns 13 points. If the bid is missed, the player earns one point for each trick actually taken: a bid of 3 followed by 4 tricks scores 4; taking 2 tricks scores 2.</p>
+<p>The bids in a regular round cannot add up to exactly the number of tricks available. The dealer must adjust their nomination if the total would match it. This makes at least one player miss the exact count and is part of this app’s current house rules.</p>
+<p>In a Miss round, the aim is to take no tricks. Each trick taken costs 3 points, so taking 2 tricks loses 6 points. Taking none scores zero and counts as a successful Miss.</p>
+<p>Under these scoring rules, the maximum for one player over a full game is <strong>196 points</strong>. That means making every regular bid: twice the sum of 10 plus each bid from 1 through 7. The four Miss rounds can add no points, but a player can avoid penalties by taking no tricks.</p>
+
+<h2>Different tables, different rules</h2>
+<p>The current game uses a 10-point exact-bid bonus, the 18-round climb–Miss–descent sequence, and the Miss penalty above. Other groups may choose a shorter “up or down” game, climb to the maximum hand, draw a random schedule, use a 5-point bonus, or score overbids and underbids differently. Those are ideas for future options; they are not configurable in the app yet. See <a href="ideas.html">New ideas</a> for the full list.</p>
+<p>In my <a href="https://hardbutnot.blogspot.com/2026/11/nomination-whist.html">Nomination Whist note</a>, I explain why I'm considering these house-rule choices. For a mathematical look at one-card Nomination Whist, see the linked <a href="https://possiblywrong.wordpress.com/2022/08/23/probabilities-in-one-card-nomination-whist/">probability analysis</a>.</p>
+
+<h2>Keeping the table together</h2>
+<p>I designed Nominate to make a long game easier to follow: bids and tricks stay beside the cumulative score, completed rounds remain visible, and the group can review how a result was made. Enter the numbers agreed at the table; the app applies the formula consistently and leaves the card play to the players.</p>
+</article>
+<nav aria-label="Game information"><h2>Explore</h2><ul><li><a href="hints.html">Hints and tips</a></li><li><a href="highscores-info.html">How highscores work</a></li><li><a href="ideas.html">New ideas</a></li></ul></nav>
+<footer><a href="/about.html">About Andisdad Games</a> · <a href="/">Andisdad Games home</a></footer>
+</main><script src="scene-switcher.js" defer></script></body></html>

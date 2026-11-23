@@ -115,6 +115,16 @@ try {
   console.error('/drying will 404 until this path is fixed (see DRYING_SERVER_PATH above).');
 }
 
+// Static Britain in six strands timeline, mounted beside the games at /history.
+var HISTORY_SERVER_PATH = path.join(ROOT_DIR, '..', 'history', 'server.js');
+var historyHandler = null;
+try {
+  historyHandler = require(HISTORY_SERVER_PATH).createHandler('/history');
+} catch (e) {
+  console.error('Could not load the history timeline from ' + HISTORY_SERVER_PATH + ': ' + e.message);
+  console.error('/history will 404 until this path is fixed (see HISTORY_SERVER_PATH above).');
+}
+
 // HTTPS is optional - see the "HTTPS" block near the bottom of this file.
 var HTTPS_PORT = process.env.HTTPS_PORT || 443;
 var HTTPS_CERT_FILE = process.env.HTTPS_CERT_FILE || path.join(ROOT_DIR, 'certs', 'fullchain.pem');
@@ -225,6 +235,20 @@ function serveStatic(req, res) {
     var servedExt = path.extname(filePath).toLowerCase();
     res.writeHead(200, { 'Content-Type': MIME_TYPES[servedExt] || 'application/octet-stream' });
     res.end(data);
+  });
+}
+
+// The service-level About page lives beside the workspace root index.html.
+// Dullas keeps its own game guide at /dullas/about.html.
+function serveAndisdadAbout(req, res) {
+  fs.readFile(path.join(ROOT_DIR, '..', 'about.html'), function (err, data) {
+    if (err) {
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('Not found');
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': MIME_TYPES['.html'] });
+    res.end(req.method === 'HEAD' ? undefined : data);
   });
 }
 
@@ -488,6 +512,11 @@ function handlePostEvents(req, res) {
   });
 }
 
+// Root-level Dullas pages that now live canonically under /dullas/.
+// (home.html / '/' stays the site home page.)
+var DULLAS_ROOT_PAGES = ['/index.html', '/hints.html', '/ideas.html',
+  '/highscores.html', '/highscores-info.html'];
+
 // Shared by both the HTTP and HTTPS listeners below - same routes, same
 // static files, just two different sockets.
 function requestHandler(req, res) {
@@ -503,6 +532,40 @@ function requestHandler(req, res) {
   if (dryingHandler && (urlPath === '/drying' || urlPath.indexOf('/drying/') === 0)) {
     dryingHandler(req, res);
     return;
+  }
+  if (historyHandler && (urlPath === '/history' || urlPath.indexOf('/history/') === 0)) {
+    historyHandler(req, res);
+    return;
+  }
+  // Canonical home for the Dullas game pages is /dullas/... (matching the
+  // canonical <link> tags). The files still live at the web root, so:
+  //  - /dullas -> /dullas/ (302, keeps relative asset paths resolving)
+  //  - /dullas/ -> index.html, /dullas/<file> -> /<file> (served in place)
+  //  - the old root page URLs 301 to their /dullas/ equivalents.
+  if (req.method === 'GET' || req.method === 'HEAD') {
+    var qIdx = req.url.indexOf('?');
+    var query = qIdx === -1 ? '' : req.url.slice(qIdx);
+    if (urlPath === '/about.html') {
+      serveAndisdadAbout(req, res);
+      return;
+    }
+    if (urlPath === '/dullas') {
+      res.writeHead(302, { Location: '/dullas/' + query });
+      res.end();
+      return;
+    }
+    if (urlPath.indexOf('/dullas/') === 0) {
+      var rest = urlPath.slice('/dullas/'.length);
+      req.url = '/' + (rest === '' ? 'index.html' : rest) + query;
+      serveStatic(req, res);
+      return;
+    }
+    if (DULLAS_ROOT_PAGES.indexOf(urlPath) !== -1) {
+      var target = urlPath === '/index.html' ? '/dullas/' : '/dullas' + urlPath;
+      res.writeHead(301, { Location: target + query });
+      res.end();
+      return;
+    }
   }
   if (req.method === 'POST' && urlPath === '/api/score') { handlePostScore(req, res); return; }
   if (req.method === 'GET' && urlPath === '/api/highscores') { handleGetHighscores(req, res); return; }

@@ -1,5 +1,6 @@
 // Generate side-by-side minified deployable assets. Originals stay editable
-// and are never overwritten. Run only via `npm run build`, which runs tests first.
+// and are never overwritten. Use `npm run build:assets` to skip tests, or
+// `npm run build` to run tests before generating assets.
 const fs = require('node:fs');
 const path = require('node:path');
 const { minify: minifyJs } = require('terser');
@@ -7,8 +8,13 @@ const minifyHtml = require('html-minifier-terser').minify;
 const CleanCSS = require('clean-css');
 
 const root = path.resolve(__dirname, '..');
-const gameRoots = ['dullas/current', 'nominate', 'standup', 'drying'];
-const skipDirs = new Set(['node_modules', 'data', 'versions', 'OLDER', '.git']);
+// Local checkouts may keep the active Dullas app in dullas/ or in
+// dullas/current/. The deployed service uses /home/pi2/andisdad/dullas/.
+const dullasRoot = fs.existsSync(path.join(root, 'dullas', 'current'))
+  ? path.join(root, 'dullas', 'current')
+  : path.join(root, 'dullas');
+const gameRoots = [dullasRoot, 'nominate', 'standup', 'drying', 'history'];
+const skipDirs = new Set(['node_modules', 'data', 'versions', 'not-current', 'OLDER', 'certs', '.git']);
 
 function walk(dir, files = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -23,7 +29,8 @@ function walk(dir, files = []) {
 (async () => {
   let count = 0;
   for (const gameRoot of gameRoots) {
-    for (const file of walk(path.join(root, gameRoot))) {
+    const gamePath = path.isAbsolute(gameRoot) ? gameRoot : path.join(root, gameRoot);
+    for (const file of walk(gamePath)) {
       const ext = path.extname(file).toLowerCase();
       let output;
       if (ext === '.js') {
